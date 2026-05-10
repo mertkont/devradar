@@ -1,0 +1,52 @@
+{
+  "name": "devradar-vscode",
+  "displayName": "devradar",
+  "description": "Hangi takım arkadaşın şu an kod yazıyor — IDE'den bağımsız presence",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "devradar",
+      "properties": {
+        "devradar.serverUrl": {
+          "type": "string",
+          "default": "wss://devradar.mrt-kntt53.workers.dev/ws",
+          "description": "devradar WebSocket sunucu adresi"
+        },
+        "devradar.sharedToken": {
+          "type": "string",
+          "default": "",
+          "description": "Takımın paylaşılan token'ı (Cloudflare'deki SHARED_TOKEN ile aynı)"
+        },
+        "devradar.userName": {
+          "type": "string",
+          "default": "",
+          "description": "Görünecek isim (boş bırakılırsa işletim sistemi kullanıcı adı kullanılır)"
+        }
+      }
+    },
+    "commands": [
+      { "command": "devradar.showPeers", "title": "devradar: Kimler online?" },
+      { "command": "devradar.reconnect", "title": "devradar: Yeniden bağlan" }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -p . --watch"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.0",
+    "typescript": "^5.4.0"
+  }
+}
