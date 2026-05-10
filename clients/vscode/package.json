@@ -1,11 +1,21 @@
 {
   "name": "devradar-vscode",
   "displayName": "devradar",
-  "description": "Hangi takım arkadaşın şu an kod yazıyor — IDE'den bağımsız presence",
+  "description": "Hangi takım arkadaşın şu an aynı repoda kod yazıyor — IDE'den bağımsız presence",
   "version": "0.1.0",
-  "private": true,
+  "publisher": "mertkont",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mertkont/devradar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mertkont/devradar/issues"
+  },
+  "homepage": "https://github.com/mertkont/devradar#readme",
+  "keywords": ["presence", "team", "collaboration", "status", "online"],
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.96.0"
   },
   "categories": ["Other"],
   "activationEvents": ["onStartupFinished"],
@@ -38,15 +48,19 @@
   },
   "scripts": {
     "compile": "tsc -p .",
-    "watch": "tsc -p . --watch"
+    "watch": "tsc -p . --watch",
+    "vscode:prepublish": "tsc -p .",
+    "package": "vsce package",
+    "publish": "vsce publish"
   },
   "dependencies": {
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "~1.96.0",
     "@types/ws": "^8.5.0",
+    "@vscode/vsce": "^3.9.1",
     "typescript": "^5.4.0"
   }
 }
