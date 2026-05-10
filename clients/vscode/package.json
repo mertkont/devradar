@@ -17,17 +17,17 @@
         "devradar.serverUrl": {
           "type": "string",
           "default": "wss://devradar.mrt-kntt53.workers.dev/ws",
-          "description": "devradar WebSocket sunucu adresi"
+          "description": "devradar WebSocket sunucu adresi (genelde değiştirmene gerek yok)"
         },
-        "devradar.sharedToken": {
+        "devradar.displayName": {
           "type": "string",
           "default": "",
-          "description": "Takımın paylaşılan token'ı (Cloudflare'deki SHARED_TOKEN ile aynı)"
+          "description": "Görünecek isim. Boş bırakılırsa git'teki adın (user.name) otomatik kullanılır."
         },
-        "devradar.userName": {
+        "devradar.teamKey": {
           "type": "string",
           "default": "",
-          "description": "Görünecek isim (boş bırakılırsa işletim sistemi kullanıcı adı kullanılır)"
+          "description": "Opsiyonel gizlilik anahtarı. Aynı repodaki herkes aynı değeri girerse, repo adresini bilen yabancılar odaya giremez. Boş bırakılabilir — repo adresi tek başına eşleştirme için yeterli."
         }
       }
     },

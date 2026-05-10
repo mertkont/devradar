@@ -2,7 +2,6 @@
 
 export interface Env {
   PRESENCE: DurableObjectNamespace;
-  SHARED_TOKEN?: string;
 }
 
 export default {
@@ -13,8 +12,21 @@ export default {
       if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
         return new Response("expected websocket upgrade", { status: 426 });
       }
-      const id = env.PRESENCE.idFromName("global-room");
+      const room = (url.searchParams.get("room") ?? "").trim();
+      if (!room || room.length > 512) {
+        return new Response("missing or invalid 'room' query parameter", { status: 400 });
+      }
+      const id = env.PRESENCE.idFromName(room);
       const stub = env.PRESENCE.get(id);
+      return stub.fetch(request);
+    }
+
+    if (url.pathname === "/room" && request.method === "DELETE") {
+      const room = (url.searchParams.get("room") ?? "").trim();
+      if (!room || room.length > 512) {
+        return new Response("missing or invalid 'room' query parameter", { status: 400 });
+      }
+      const stub = env.PRESENCE.get(env.PRESENCE.idFromName(room));
       return stub.fetch(request);
     }
 
@@ -43,14 +55,26 @@ type StoredMember = {
 };
 
 type ClientMsg =
-  | { type: "hello"; token: string; userId: string; userName: string; ide: string; project: string }
+  | { type: "hello"; userId: string; userName: string; ide: string; project: string }
   | { type: "update"; file?: string | null; line?: number | null; project?: string }
   | { type: "heartbeat" };
 
 export class PresenceRoom implements DurableObject {
-  constructor(private ctx: DurableObjectState, private env: Env) {}
+  constructor(private ctx: DurableObjectState) {}
 
-  async fetch(_request: Request): Promise<Response> {
+  async fetch(request: Request): Promise<Response> {
+    if (request.method === "DELETE") {
+      for (const s of this.ctx.getWebSockets()) {
+        try {
+          s.close(1000, "room reset");
+        } catch {
+          // ignore
+        }
+      }
+      await this.ctx.storage.deleteAll();
+      return new Response("room cleared\n", { status: 200 });
+    }
+
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
@@ -70,22 +94,16 @@ export class PresenceRoom implements DurableObject {
     if (!msg) return;
 
     if (msg.type === "hello") {
-      const expected = this.env.SHARED_TOKEN ?? "dev-secret-change-me";
-      if (msg.token !== expected) {
-        ws.send(JSON.stringify({ type: "error", message: "invalid token" }));
-        ws.close(1008, "invalid token");
-        return;
-      }
       if (!msg.userId || !msg.userName) {
         ws.send(JSON.stringify({ type: "error", message: "missing userId or userName" }));
         ws.close(1008, "bad hello");
         return;
       }
       const att: Attachment = {
-        userId: msg.userId,
-        userName: msg.userName,
-        ide: msg.ide || "unknown",
-        project: msg.project || "unknown",
+        userId: String(msg.userId).slice(0, 128),
+        userName: String(msg.userName).slice(0, 128),
+        ide: (msg.ide || "unknown").slice(0, 64),
+        project: (msg.project || "unknown").slice(0, 256),
         file: null,
         line: null,
       };
@@ -101,9 +119,9 @@ export class PresenceRoom implements DurableObject {
     if (!att) return;
 
     if (msg.type === "update") {
-      att.file = msg.file ?? null;
-      att.line = msg.line ?? null;
-      if (msg.project) att.project = msg.project;
+      att.file = msg.file ? String(msg.file).slice(0, 512) : null;
+      att.line = typeof msg.line === "number" ? msg.line : null;
+      if (msg.project) att.project = String(msg.project).slice(0, 256);
       ws.serializeAttachment(att);
       await this.broadcast();
       return;

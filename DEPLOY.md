@@ -1,7 +1,11 @@
 # devradar — Cloudflare Workers + Durable Objects
 
 Çok-IDE'li geliştirici "presence" sunucusu. Kim hangi IDE'de, hangi dosyada,
-online mi offline mı — hepsi tek bir WebSocket bağlantısı üzerinden.
+online mı offline mı — hepsi tek bir WebSocket bağlantısı üzerinden.
+
+**Eşleştirme modeli:** oda anahtarı = içinde bulunduğun git reposu. Aynı repoyu
+açan herkes otomatik aynı odada. Token yok, giriş yok. (İstenirse opsiyonel bir
+"team key" odanın anahtarına karıştırılır — repo adresini bilen yabancılar girmesin diye.)
 
 - Hosting: **Cloudflare Workers** (ücretsiz plan, kredi kartı gerekmez)
 - Durum: **Durable Object** (`PresenceRoom`), SQLite destekli — free plan'da çalışır
@@ -14,52 +18,37 @@ npm install
 npm run dev          # wrangler dev — http://localhost:8787
 ```
 
-Local'de `SHARED_TOKEN` değeri `.dev.vars` dosyasından okunur (varsayılan: `test123`).
-
 ### Test
 
 `npm run dev` açıkken başka bir terminalde:
 
 ```bash
-node test-clients.mjs
+node test-clients.mjs                          # room=test-room
+DEVRADAR_ROOM=baska-oda node test-clients.mjs  # farklı oda
 ```
 
 İki sahte client bağlanır, dosya değiştirir, biri ayrılır — presence akışını görürsün.
 
-## Cloudflare'e deploy (ilk kez)
-
-1. **Cloudflare hesabı aç** (ücretsiz, kart istemez): https://dash.cloudflare.com/sign-up
-
-2. **Wrangler ile giriş yap** (tarayıcı açılır, "Allow" dersin):
-   ```bash
-   cd ~/Desktop/devradar
-   npx wrangler login
-   ```
-
-3. **Paylaşılan token'ı secret olarak ata** (takıma vereceğin gizli dize):
-   ```bash
-   npx wrangler secret put SHARED_TOKEN
-   # sorunca güçlü bir değer yapıştır, mesela: openssl rand -hex 24 çıktısı
-   ```
-
-4. **Deploy**:
-   ```bash
-   npm run deploy
-   ```
-   Çıktıda şuna benzer bir URL göreceksin:
-   `https://devradar.<senin-subdomain>.workers.dev`
-
-5. WebSocket bağlantı adresi:
-   `wss://devradar.<senin-subdomain>.workers.dev/ws`
-   Health kontrolü: `https://devradar.<senin-subdomain>.workers.dev/health` → `devradar ok`
-
-   **Bu URL'i bana söyle** — IDE eklentilerine onu yazacağım.
-
-## Sonraki güncellemeler
+Bir odayı sıfırlamak (üye listesini temizlemek):
 
 ```bash
+curl -X DELETE "http://localhost:8787/room?room=test-room"
+```
+
+## Cloudflare'e deploy
+
+GitHub'a bağlı olduğu için her `git push` otomatik deploy eder (Cloudflare Workers Builds).
+Manuel deploy de mümkün:
+
+```bash
+npx wrangler login     # ilk kez — tarayıcı açılır
 npm run deploy
 ```
+
+> **Not:** Eski `SHARED_TOKEN` secret'ı artık kullanılmıyor — Cloudflare dashboard'dan silebilirsin.
+
+URL: `https://devradar.<subdomain>.workers.dev`
+Health: `.../health` → `devradar ok`
 
 ## Loglar
 
@@ -69,16 +58,17 @@ npx wrangler tail
 
 ## Protokol
 
-WebSocket adresi: `wss://.../ws`
+WebSocket adresi: `wss://devradar.<subdomain>.workers.dev/ws?room=<oda-anahtarı>`
+— `room` zorunlu, yoksa 400 döner.
 
 Client → Server (JSON):
 
 ```jsonc
-// 1) İlk mesaj — kayıt (token doğrulanır)
-{ "type": "hello", "token": "...", "userId": "u1", "userName": "Mert", "ide": "vscode", "project": "azure-proj" }
+// 1) İlk mesaj — kayıt
+{ "type": "hello", "userId": "e:ab12…", "userName": "Mert Kont", "ide": "vscode", "project": "github.com/mertkont/devradar" }
 
-// 2) Aktif dosya değişti (istediğin sıklıkta)
-{ "type": "update", "file": "src/index.ts", "line": 42, "project": "azure-proj" }
+// 2) Aktif dosya değişti
+{ "type": "update", "file": "src/index.ts", "line": 42, "project": "github.com/mertkont/devradar" }
 
 // 3) Heartbeat — opsiyonel; bağlantının canlılığı zaten yeterli
 { "type": "heartbeat" }
@@ -87,19 +77,29 @@ Client → Server (JSON):
 Server → Client (JSON):
 
 ```jsonc
-{ "type": "welcome", "userId": "u1" }
+{ "type": "welcome", "userId": "e:ab12…" }
 
 { "type": "presence", "users": [
-  { "userId": "u1", "userName": "Mert", "ide": "vscode", "project": "azure-proj",
-    "file": "src/index.ts", "line": 42, "status": "online" },
-  { "userId": "u2", "userName": "Ayse", "ide": "rider", "project": "azure-proj",
-    "file": null, "line": null, "status": "offline" }
+  { "userId": "e:ab12…", "userName": "Mert Kont", "ide": "vscode",
+    "project": "github.com/mertkont/devradar", "file": "src/index.ts", "line": 42, "status": "online" },
+  { "userId": "e:cd34…", "userName": "Ayşe Y.", "ide": "rider",
+    "project": "github.com/mertkont/devradar", "file": null, "line": null, "status": "offline" }
 ] }
 
-{ "type": "error", "message": "invalid token" }
+{ "type": "error", "message": "missing userId or userName" }
+```
+
+Yönetim:
+
+```
+DELETE /room?room=<oda-anahtarı>   →  o odanın üye listesini ve bağlantılarını sıfırlar
 ```
 
 Notlar:
-- IDE uygulaması kapanınca / bilgisayar uyuyunca WebSocket kopar → kullanıcı **offline** olur ama listede kalır (geçmişte bağlanmış herkes hatırlanır).
-- Aynı kullanıcı birden fazla cihazdan bağlanabilir; biri kopsa diğeri açıkken **online** kalır.
-- `userId` Azure DevOps / Entra kullanıcı kimliğin olabilir (eklenti aşamasında bağlarız).
+- `userId` git e-postasının hash'i (`e:` öneki). Aynı kişi laptop'ta da masaüstünde de
+  aynı git e-postasını kullandığı için **tek bir kişi** olarak görünür; biri kopsa diğeri
+  açıkken **online** kalır. Git e-postası yoksa rastgele bir kimlik (`x:` öneki) üretilir.
+- `userName` git'teki `user.name`. Eklentide `devradar.displayName` ile değiştirilebilir.
+- IDE kapanınca / bilgisayar uyuyunca WebSocket kopar → kullanıcı **offline** olur ama
+  o odada görünmeye devam eder (geçmişte bağlanmış herkes hatırlanır).
+- Oda anahtarı eklentide şöyle üretilir: `sha256(normalize(remote.origin.url) [+ "|" + teamKey])`.

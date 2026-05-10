@@ -1,13 +1,14 @@
 import { WebSocket } from "ws";
 
 // wrangler dev varsayılan olarak http://localhost:8787 dinler
-const URL = process.env.DEVRADAR_URL ?? "ws://localhost:8787/ws";
-const TOKEN = process.env.DEVRADAR_TOKEN ?? "test123";
+const BASE = process.env.DEVRADAR_URL ?? "ws://localhost:8787/ws";
+const ROOM = process.env.DEVRADAR_ROOM ?? "test-room";
+const URL = `${BASE}?room=${encodeURIComponent(ROOM)}`;
 
 function makeClient(userId, userName, ide, project) {
   const ws = new WebSocket(URL);
   ws.on("open", () => {
-    ws.send(JSON.stringify({ type: "hello", token: TOKEN, userId, userName, ide, project }));
+    ws.send(JSON.stringify({ type: "hello", userId, userName, ide, project }));
   });
   ws.on("message", (data) => {
     const msg = JSON.parse(data.toString());
@@ -29,7 +30,7 @@ const a = makeClient("u1", "Mert", "vscode", "azure-proj");
 const b = makeClient("u2", "Ayse", "rider", "azure-proj");
 
 setTimeout(() => {
-  console.log("\n--- Mert opens server.ts ---");
+  console.log("\n--- Mert opens index.ts ---");
   a.send(JSON.stringify({ type: "update", file: "src/index.ts", line: 42 }));
 }, 700);
 
