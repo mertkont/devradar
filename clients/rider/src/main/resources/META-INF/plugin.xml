@@ -17,5 +17,9 @@
         <postStartupActivity implementation="dev.devradar.DevradarStartupActivity"/>
         <statusBarWidgetFactory id="devradar.statusBar"
                                 implementation="dev.devradar.DevradarStatusBarWidgetFactory"/>
+        <applicationConfigurable parentId="tools"
+                                 id="dev.devradar.settings"
+                                 displayName="devradar"
+                                 instance="dev.devradar.DevradarConfigurable"/>
     </extensions>
 </idea-plugin>

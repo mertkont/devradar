@@ -52,7 +52,10 @@ type StoredMember = {
   userName: string;
   ide: string;
   project: string;
+  lastSeen: number;
 };
+
+const STALE_MEMBER_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 type ClientMsg =
   | { type: "hello"; userId: string; userName: string; ide: string; project: string }
@@ -108,8 +111,15 @@ export class PresenceRoom implements DurableObject {
         line: null,
       };
       ws.serializeAttachment(att);
-      const member: StoredMember = { userId: att.userId, userName: att.userName, ide: att.ide, project: att.project };
+      const member: StoredMember = {
+        userId: att.userId,
+        userName: att.userName,
+        ide: att.ide,
+        project: att.project,
+        lastSeen: Date.now(),
+      };
       await this.ctx.storage.put(`member:${att.userId}`, member);
+      await this.pruneStaleMembers();
       ws.send(JSON.stringify({ type: "welcome", userId: att.userId }));
       await this.broadcast();
       return;
@@ -136,6 +146,21 @@ export class PresenceRoom implements DurableObject {
 
   async webSocketError(ws: WebSocket): Promise<void> {
     await this.broadcast(ws);
+  }
+
+  private async pruneStaleMembers(): Promise<void> {
+    const now = Date.now();
+    const connected = new Set<string>();
+    for (const s of this.ctx.getWebSockets()) {
+      const a = s.deserializeAttachment() as Attachment | null;
+      if (a) connected.add(a.userId);
+    }
+    const stored = await this.ctx.storage.list<StoredMember>({ prefix: "member:" });
+    const toDelete: string[] = [];
+    for (const [key, m] of stored) {
+      if (!connected.has(m.userId) && now - (m.lastSeen ?? 0) > STALE_MEMBER_MS) toDelete.push(key);
+    }
+    if (toDelete.length) await this.ctx.storage.delete(toDelete);
   }
 
   private async broadcast(exclude?: WebSocket): Promise<void> {
