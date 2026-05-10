@@ -1,0 +1,285 @@
+package dev.devradar
+
+import com.google.gson.Gson
+import com.google.gson.JsonParser
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationInfo
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.wm.WindowManager
+import com.intellij.util.concurrency.AppExecutorUtil
+import java.io.File
+import java.net.URI
+import java.net.URLEncoder
+import java.net.http.HttpClient
+import java.net.http.WebSocket
+import java.security.MessageDigest
+import java.util.concurrent.CompletionStage
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+
+const val DEVRADAR_WIDGET_ID = "devradar.statusBar"
+private const val SERVER_URL = "wss://devradar.mrt-kntt53.workers.dev/ws"
+
+data class DevradarUser(
+    val userId: String,
+    val userName: String,
+    val ide: String,
+    val project: String,
+    val file: String?,
+    val line: Int?,
+    val status: String,
+)
+
+@Service(Service.Level.PROJECT)
+class DevradarService(private val project: Project) : Disposable {
+
+    private val log = thisLogger()
+    private val gson = Gson()
+    private val httpClient: HttpClient = HttpClient.newBuilder()
+        .connectTimeout(java.time.Duration.ofSeconds(10))
+        .build()
+    private val exec = AppExecutorUtil.getAppScheduledExecutorService()
+    private val disposed = AtomicBoolean(false)
+
+    @Volatile private var ws: WebSocket? = null
+    @Volatile private var heartbeat: ScheduledFuture<*>? = null
+    @Volatile private var roomKey: String? = null
+    @Volatile private var noRepo = false
+    @Volatile private var probed = false
+    @Volatile private var projectLabel: String = "?"
+    @Volatile private var selfId: String = ""
+    @Volatile private var userName: String = "anon"
+
+    @Volatile var users: List<DevradarUser> = emptyList()
+        private set
+
+    fun start() {
+        project.messageBus.connect(this).subscribe(
+            FileEditorManagerListener.FILE_EDITOR_MANAGER,
+            object : FileEditorManagerListener {
+                override fun selectionChanged(event: FileEditorManagerEvent) = sendUpdate(event.newFile)
+            },
+        )
+        connect()
+    }
+
+    private fun connect() {
+        if (disposed.get()) return
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val basePath = project.basePath
+                val remote = basePath?.let { gitConfig(it, "--get", "remote.origin.url") }
+                if (remote.isNullOrBlank()) {
+                    noRepo = true
+                    probed = true
+                    refreshWidget()
+                    return@executeOnPooledThread
+                }
+                val repo = normalizeRemote(remote)
+                projectLabel = repo
+                roomKey = "repo:" + sha256Short(repo)
+                userName = basePath?.let { gitConfig(it, "user.name") }?.takeIf { it.isNotBlank() }
+                    ?: System.getProperty("user.name") ?: "anon"
+                val email = basePath?.let { gitConfig(it, "user.email") }?.lowercase()
+                selfId = if (!email.isNullOrBlank()) "e:" + sha256Short(email)
+                else "x:" + sha256Short((System.getProperty("user.name") ?: "") + "@" + (basePath ?: project.name))
+                probed = true
+                refreshWidget()
+
+                val uri = URI.create("$SERVER_URL?room=${URLEncoder.encode(roomKey, "UTF-8")}")
+                httpClient.newWebSocketBuilder().buildAsync(uri, Listener()).whenComplete { socket, err ->
+                    if (err != null) {
+                        log.warn("devradar: connect failed: ${err.message}")
+                        scheduleReconnect()
+                    } else {
+                        ws = socket
+                    }
+                }
+            } catch (t: Throwable) {
+                log.warn("devradar: connect error", t)
+                scheduleReconnect()
+            }
+        }
+    }
+
+    private inner class Listener : WebSocket.Listener {
+        private val buf = StringBuilder()
+
+        override fun onOpen(webSocket: WebSocket) {
+            webSocket.request(1)
+            send(webSocket, mapOf(
+                "type" to "hello",
+                "userId" to selfId,
+                "userName" to userName,
+                "ide" to ideName(),
+                "project" to projectLabel,
+            ))
+            sendUpdate(selectedFile())
+            heartbeat = exec.scheduleWithFixedDelay(
+                { ws?.let { send(it, mapOf("type" to "heartbeat")) } },
+                30, 30, TimeUnit.SECONDS,
+            )
+            refreshWidget()
+        }
+
+        override fun onText(webSocket: WebSocket, data: CharSequence, last: Boolean): CompletionStage<*>? {
+            buf.append(data)
+            if (last) {
+                val text = buf.toString()
+                buf.setLength(0)
+                handleMessage(text)
+            }
+            webSocket.request(1)
+            return null
+        }
+
+        override fun onClose(webSocket: WebSocket, statusCode: Int, reason: String?): CompletionStage<*>? {
+            onDisconnect(); return null
+        }
+
+        override fun onError(webSocket: WebSocket, error: Throwable?) = onDisconnect()
+    }
+
+    private fun onDisconnect() {
+        ws = null
+        heartbeat?.cancel(false); heartbeat = null
+        refreshWidget()
+        scheduleReconnect()
+    }
+
+    private fun scheduleReconnect() {
+        if (disposed.get()) return
+        exec.schedule({ connect() }, 5, TimeUnit.SECONDS)
+    }
+
+    private fun handleMessage(text: String) {
+        try {
+            val obj = JsonParser.parseString(text).asJsonObject
+            if (obj.get("type")?.asString != "presence") return
+            val arr = obj.getAsJsonArray("users") ?: return
+            users = arr.map { e ->
+                val u = e.asJsonObject
+                fun strOrNull(k: String) = u.get(k)?.takeIf { !it.isJsonNull }?.asString
+                DevradarUser(
+                    userId = strOrNull("userId") ?: "",
+                    userName = strOrNull("userName") ?: "?",
+                    ide = strOrNull("ide") ?: "?",
+                    project = strOrNull("project") ?: "?",
+                    file = strOrNull("file"),
+                    line = u.get("line")?.takeIf { !it.isJsonNull }?.asInt,
+                    status = strOrNull("status") ?: "offline",
+                )
+            }
+            refreshWidget()
+        } catch (t: Throwable) {
+            log.debug("devradar: bad message: $text", t)
+        }
+    }
+
+    private fun sendUpdate(file: VirtualFile?) {
+        val socket = ws ?: return
+        val basePath = project.basePath
+        val rel = when {
+            file == null -> null
+            basePath != null && file.path.startsWith(basePath) -> file.path.removePrefix(basePath).trimStart('/')
+            else -> file.name
+        }
+        send(socket, mapOf("type" to "update", "file" to rel, "line" to null, "project" to projectLabel))
+    }
+
+    private fun selectedFile(): VirtualFile? =
+        FileEditorManager.getInstance(project).selectedFiles.firstOrNull()
+
+    private fun send(socket: WebSocket, payload: Map<String, Any?>) {
+        val json = gson.toJson(payload)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                socket.sendText(json, true).get(3, TimeUnit.SECONDS)
+            } catch (t: Throwable) {
+                log.debug("devradar: send failed", t)
+            }
+        }
+    }
+
+    private fun refreshWidget() {
+        ApplicationManager.getApplication().invokeLater {
+            if (!project.isDisposed) WindowManager.getInstance().getStatusBar(project)?.updateWidget(DEVRADAR_WIDGET_ID)
+        }
+    }
+
+    fun statusText(): String = when {
+        noRepo -> "devradar: repo yok"
+        !probed -> "devradar: …"
+        ws == null -> "devradar: bağlanıyor…"
+        else -> "devradar: ${users.count { it.status == "online" }} online"
+    }
+
+    fun tooltipText(): String {
+        if (noRepo) return "Bu projenin git remote'u yok — devradar repo bazlı çalışır."
+        val others = users.filter { it.status == "online" && it.userId != selfId }
+        return buildString {
+            append("Repo: ").append(projectLabel)
+            if (others.isEmpty()) append("\nŞu an bu repoda tek başınasın.")
+            else others.forEach { u ->
+                append("\n• ").append(u.userName).append(" — ").append(u.ide)
+                if (u.file != null) append(" · ").append(u.file)
+            }
+        }
+    }
+
+    override fun dispose() {
+        disposed.set(true)
+        heartbeat?.cancel(false)
+        try { ws?.sendClose(WebSocket.NORMAL_CLOSURE, "ide closing") } catch (_: Throwable) {}
+        ws = null
+    }
+
+    companion object {
+        fun getInstance(project: Project): DevradarService = project.getService(DevradarService::class.java)
+    }
+}
+
+private fun ideName(): String {
+    val n = ApplicationInfo.getInstance().versionName.lowercase()
+    return when {
+        "rider" in n -> "rider"
+        "intellij" in n || "idea" in n -> "intellij"
+        "pycharm" in n -> "pycharm"
+        "webstorm" in n -> "webstorm"
+        "goland" in n -> "goland"
+        "clion" in n -> "clion"
+        "phpstorm" in n -> "phpstorm"
+        "rubymine" in n -> "rubymine"
+        else -> "jetbrains"
+    }
+}
+
+private fun gitConfig(cwd: String, vararg args: String): String? = try {
+    val pb = ProcessBuilder(listOf("git", "config") + args).directory(File(cwd))
+    val p = pb.start()
+    val out = p.inputStream.bufferedReader().readText().trim()
+    if (!p.waitFor(3, TimeUnit.SECONDS)) { p.destroyForcibly(); null } else out.ifBlank { null }
+} catch (t: Throwable) {
+    null
+}
+
+private fun normalizeRemote(url: String): String {
+    var s = url.trim()
+    if (s.endsWith(".git", ignoreCase = true)) s = s.dropLast(4)
+    Regex("""^[^@\s]+@([^:\s]+):(.+)$""").find(s)?.let { return "${it.groupValues[1]}/${it.groupValues[2]}".lowercase() }
+    Regex("""^[a-zA-Z][a-zA-Z0-9+.\-]*://(?:[^@/\s]+@)?([^/:\s]+)(?::\d+)?/(.+)$""").find(s)
+        ?.let { return "${it.groupValues[1]}/${it.groupValues[2]}".lowercase() }
+    return s.lowercase()
+}
+
+private fun sha256Short(s: String): String =
+    MessageDigest.getInstance("SHA-256").digest(s.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }.take(16)

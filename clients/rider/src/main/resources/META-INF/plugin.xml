@@ -1,0 +1,21 @@
+<idea-plugin>
+    <id>dev.devradar.ide</id>
+    <name>devradar</name>
+    <vendor url="https://github.com/mertkont/devradar">devradar</vendor>
+
+    <description><![CDATA[
+        <p>Aynı git reposunu açan takım arkadaşlarının <b>şu an kod yazıp yazmadığını</b> gösterir —
+        IDE'den ve işletim sisteminden bağımsız. Kim online, kim offline, kim hangi dosyada.</p>
+        <p>Sıfır ayar: kimliğin git'teki <code>user.name</code> / <code>user.email</code>'den, "odan" da
+        reponun <code>remote.origin.url</code> adresinden otomatik gelir. Aynı repoyu açan herkes aynı odada.</p>
+        <p>Sunucu açık kaynak: <a href="https://github.com/mertkont/devradar">github.com/mertkont/devradar</a></p>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <postStartupActivity implementation="dev.devradar.DevradarStartupActivity"/>
+        <statusBarWidgetFactory id="devradar.statusBar"
+                                implementation="dev.devradar.DevradarStatusBarWidgetFactory"/>
+    </extensions>
+</idea-plugin>
