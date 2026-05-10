@@ -1,0 +1,25 @@
+{
+  "name": "devradar",
+  "version": "0.1.0",
+  "description": "Multi-IDE developer presence tracker",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260510.1",
+    "@types/node": "^25.6.2",
+    "@types/ws": "^8.18.1",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.90.0"
+  }
+}
