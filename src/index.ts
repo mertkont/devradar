@@ -45,6 +45,7 @@ type Attachment = {
   project: string;
   file?: string | null;
   line?: number | null;
+  lastSeen: number;
 };
 
 type StoredMember = {
@@ -55,7 +56,10 @@ type StoredMember = {
   lastSeen: number;
 };
 
-const STALE_MEMBER_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const STALE_MEMBER_MS = 30 * 24 * 60 * 60 * 1000; // 30 days — for purging long-gone offline members
+// Client heartbeats every 30s. We treat a socket as dead after ~2.5 missed heartbeats.
+const STALE_SOCKET_MS = 75 * 1000;
+const ALARM_INTERVAL_MS = 30 * 1000;
 
 type ClientMsg =
   | { type: "hello"; userId: string; userName: string; ide: string; project: string }
@@ -96,6 +100,8 @@ export class PresenceRoom implements DurableObject {
     }
     if (!msg) return;
 
+    const now = Date.now();
+
     if (msg.type === "hello") {
       if (!msg.userId || !msg.userName) {
         ws.send(JSON.stringify({ type: "error", message: "missing userId or userName" }));
@@ -109,6 +115,7 @@ export class PresenceRoom implements DurableObject {
         project: (msg.project || "unknown").slice(0, 256),
         file: null,
         line: null,
+        lastSeen: now,
       };
       ws.serializeAttachment(att);
       const member: StoredMember = {
@@ -116,17 +123,21 @@ export class PresenceRoom implements DurableObject {
         userName: att.userName,
         ide: att.ide,
         project: att.project,
-        lastSeen: Date.now(),
+        lastSeen: now,
       };
       await this.ctx.storage.put(`member:${att.userId}`, member);
       await this.pruneStaleMembers();
       ws.send(JSON.stringify({ type: "welcome", userId: att.userId }));
       await this.broadcast();
+      await this.ensureAlarm();
       return;
     }
 
     const att = ws.deserializeAttachment() as Attachment | null;
     if (!att) return;
+
+    // Any message from the client (update, heartbeat) refreshes liveness.
+    att.lastSeen = now;
 
     if (msg.type === "update") {
       att.file = msg.file ? String(msg.file).slice(0, 512) : null;
@@ -137,7 +148,8 @@ export class PresenceRoom implements DurableObject {
       return;
     }
 
-    // heartbeat: connection liveness is enough on its own, nothing to do
+    // heartbeat: just persist the refreshed lastSeen.
+    ws.serializeAttachment(att);
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -146,6 +158,34 @@ export class PresenceRoom implements DurableObject {
 
   async webSocketError(ws: WebSocket): Promise<void> {
     await this.broadcast(ws);
+  }
+
+  // Cloudflare Durable Object Alarm — fires periodically while there are connected sockets.
+  // Closes any socket that hasn't sent a message (hello/update/heartbeat) within STALE_SOCKET_MS.
+  async alarm(): Promise<void> {
+    const now = Date.now();
+    const toClose: WebSocket[] = [];
+    for (const s of this.ctx.getWebSockets()) {
+      const att = s.deserializeAttachment() as Attachment | null;
+      if (!att) continue;
+      if (now - (att.lastSeen ?? 0) > STALE_SOCKET_MS) toClose.push(s);
+    }
+    for (const s of toClose) {
+      try {
+        s.close(1011, "stale: no heartbeat");
+      } catch {
+        // ignore
+      }
+    }
+    if (toClose.length > 0) await this.broadcast();
+    if (this.ctx.getWebSockets().length > 0) {
+      await this.ctx.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
+    }
+  }
+
+  private async ensureAlarm(): Promise<void> {
+    const current = await this.ctx.storage.getAlarm();
+    if (current == null) await this.ctx.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
   }
 
   private async pruneStaleMembers(): Promise<void> {
@@ -164,12 +204,16 @@ export class PresenceRoom implements DurableObject {
   }
 
   private async broadcast(exclude?: WebSocket): Promise<void> {
+    const now = Date.now();
     const sockets = this.ctx.getWebSockets().filter((s) => s !== exclude);
 
     const online = new Map<string, Attachment>();
     for (const s of sockets) {
       const att = s.deserializeAttachment() as Attachment | null;
-      if (att) online.set(att.userId, att);
+      if (!att) continue;
+      // Defensive: even if the alarm hasn't pruned this socket yet, don't show stale ones as online.
+      if (now - (att.lastSeen ?? 0) > STALE_SOCKET_MS) continue;
+      online.set(att.userId, att);
     }
 
     const stored = await this.ctx.storage.list<StoredMember>({ prefix: "member:" });
