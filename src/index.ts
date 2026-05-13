@@ -136,8 +136,11 @@ export class PresenceRoom implements DurableObject {
     const att = ws.deserializeAttachment() as Attachment | null;
     if (!att) return;
 
-    // Any message from the client (update, heartbeat) refreshes liveness.
+    // Any message from the client (update, heartbeat) refreshes liveness on
+    // both the socket attachment and the persistent member record. The latter
+    // lets us show "last seen N minutes ago" for offline peers.
     att.lastSeen = now;
+    await this.touchMember(att.userId, now);
 
     if (msg.type === "update") {
       att.file = msg.file ? String(msg.file).slice(0, 512) : null;
@@ -150,6 +153,13 @@ export class PresenceRoom implements DurableObject {
 
     // heartbeat: just persist the refreshed lastSeen.
     ws.serializeAttachment(att);
+  }
+
+  private async touchMember(userId: string, now: number): Promise<void> {
+    const m = await this.ctx.storage.get<StoredMember>(`member:${userId}`);
+    if (!m) return;
+    m.lastSeen = now;
+    await this.ctx.storage.put(`member:${userId}`, m);
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -239,6 +249,7 @@ export class PresenceRoom implements DurableObject {
           file: null,
           line: null,
           status: "offline" as const,
+          lastSeen: m.lastSeen,
         });
       }
     }

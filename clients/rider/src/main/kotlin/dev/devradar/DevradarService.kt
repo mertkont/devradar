@@ -37,6 +37,7 @@ data class DevradarUser(
     val file: String?,
     val line: Int?,
     val status: String,
+    val lastSeen: Long?,
 )
 
 @Service(Service.Level.PROJECT)
@@ -203,6 +204,7 @@ class DevradarService(private val project: Project) : Disposable {
                     file = strOrNull("file"),
                     line = u.get("line")?.takeIf { !it.isJsonNull }?.asInt,
                     status = strOrNull("status") ?: "offline",
+                    lastSeen = u.get("lastSeen")?.takeIf { !it.isJsonNull }?.asLong,
                 )
             }
             refreshWidget()
@@ -309,3 +311,18 @@ private fun normalizeRemote(url: String): String {
 private fun sha256Short(s: String): String =
     MessageDigest.getInstance("SHA-256").digest(s.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it) }.take(16)
+
+fun formatLastSeen(ts: Long?): String {
+    if (ts == null || ts <= 0) return "uzun süre önce"
+    val age = (System.currentTimeMillis() - ts).coerceAtLeast(0L)
+    val sec = age / 1000
+    if (sec < 60) return "az önce"
+    val min = sec / 60
+    if (min < 60) return "$min dk önce"
+    val hr = min / 60
+    if (hr < 24) return "$hr sa önce"
+    val day = hr / 24
+    if (day < 7) return "$day gün önce"
+    if (day < 30) return "${day / 7} hafta önce"
+    return "uzun süre önce"
+}

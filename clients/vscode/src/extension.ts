@@ -15,6 +15,7 @@ type PresenceUser = {
   file: string | null;
   line: number | null;
   status: "online" | "offline";
+  lastSeen?: number;
 };
 
 type Identity = { userId: string; userName: string };
@@ -211,6 +212,21 @@ function scheduleUpdate() {
   }, 1_500);
 }
 
+function formatLastSeen(ts: number | undefined): string {
+  if (!ts || !Number.isFinite(ts)) return "uzun süre önce";
+  const ageMs = Math.max(0, Date.now() - ts);
+  const sec = Math.floor(ageMs / 1000);
+  if (sec < 60) return "az önce";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} dk önce`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} sa önce`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day} gün önce`;
+  if (day < 30) return `${Math.floor(day / 7)} hafta önce`;
+  return "uzun süre önce";
+}
+
 function setStatus(text: string, tooltip: string | vscode.MarkdownString) {
   statusBar.text = text;
   statusBar.tooltip = tooltip;
@@ -247,7 +263,10 @@ async function showPeers() {
     )
     .map((u) => ({
       label: `${u.status === "online" ? "$(circle-filled)" : "$(circle-outline)"} ${u.userName}${u.userId === selfId ? " (sen)" : ""}`,
-      description: u.status === "online" ? `${u.ide}${u.file ? " · " + u.file : ""}` : "offline",
+      description:
+        u.status === "online"
+          ? `${u.ide}${u.file ? " · " + u.file : ""}`
+          : `offline · son görülme: ${formatLastSeen(u.lastSeen)}`,
     }));
   await vscode.window.showQuickPick(items, {
     title: `devradar — ${currentRoom.projectLabel}`,

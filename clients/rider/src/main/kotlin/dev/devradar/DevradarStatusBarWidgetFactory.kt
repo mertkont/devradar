@@ -38,7 +38,11 @@ class DevradarStatusBarWidget(private val project: Project) :
             .sortedWith(compareByDescending<DevradarUser> { it.status == "online" }.thenBy { it.userName })
             .map { u ->
                 val dot = if (u.status == "online") "● " else "○ "
-                val where = if (u.status == "online") u.ide + (u.file?.let { " · $it" } ?: "") else "offline"
+                val where = if (u.status == "online") {
+                    u.ide + (u.file?.let { " · $it" } ?: "")
+                } else {
+                    "offline · son görülme: ${formatLastSeen(u.lastSeen)}"
+                }
                 "$dot${u.userName}  —  $where"
             }
         val items = rows.ifEmpty { listOf("(henüz veri yok)") }
