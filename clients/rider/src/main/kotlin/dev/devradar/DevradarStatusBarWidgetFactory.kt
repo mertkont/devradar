@@ -47,9 +47,10 @@ class DevradarStatusBarWidget(private val project: Project) :
             } else {
                 "offline · son görülme: ${formatLastSeen(u.lastSeen)}"
             }
-            val suffix = if (u.userId == svc.selfUserId) "   (sen)"
-            else if (u.status == "online") "   →  💬 sohbet"
-            else ""
+            // VS Code lets you open a chat panel with offline peers too (input
+            // stays disabled, banner explains why) — match that behaviour so
+            // clicking an offline row from the status-bar popup also works.
+            val suffix = if (u.userId == svc.selfUserId) "   (sen)" else "   →  💬 sohbet"
             rows.add("$dot${u.userName}  —  $where$suffix")
             peers.add(u)
         }
@@ -64,7 +65,9 @@ class DevradarStatusBarWidget(private val project: Project) :
                 val idx = rows.indexOf(chosen)
                 val peer = peers.getOrNull(idx) ?: return@setItemChosenCallback
                 if (peer.userId == svc.selfUserId) return@setItemChosenCallback
-                if (peer.status != "online") return@setItemChosenCallback
+                // Open chat regardless of online status — for offline peers
+                // the panel will show the banner + last-seen and keep input
+                // disabled, but the user can at least see history.
                 DevradarChatToolWindowFactory.open(project, peer.userId)
             }
             .createPopup()

@@ -44,6 +44,14 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
     }
     private val inputField = JBTextField()
     private val sendButton = JButton("Gönder")
+    // Warning ribbon between header and transcript — visible when the selected
+    // peer is offline or the WS is down, so the user understands *why* the
+    // input is greyed out. Mirrors the VS Code webview banner.
+    private val banner = JBLabel(" ").apply {
+        border = JBUI.Borders.empty(4, 8)
+        foreground = JBColor(0xCC7000, 0xE6A55A)
+        isVisible = false
+    }
 
     private val conversations = LinkedHashMap<String, MutableList<UiMessage>>()
     private val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
@@ -51,7 +59,14 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
 
     init {
         border = JBUI.Borders.empty(6)
-        add(buildHeader(), BorderLayout.NORTH)
+        // Header + banner are stacked in a wrapper so the banner sits *above*
+        // the transcript. BorderLayout respects component visibility, so the
+        // SOUTH slot collapses to zero height when banner.isVisible = false.
+        val northWrapper = JPanel(BorderLayout()).apply {
+            add(buildHeader(), BorderLayout.NORTH)
+            add(banner, BorderLayout.SOUTH)
+        }
+        add(northWrapper, BorderLayout.NORTH)
         add(JBScrollPane(transcript), BorderLayout.CENTER)
         add(buildFooter(), BorderLayout.SOUTH)
 
@@ -153,21 +168,47 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
         transcript.text = sb.toString()
         transcript.caretPosition = transcript.document.length
 
-        statusLabel.text = if (peer.online) "● online" else "○ offline"
-        statusLabel.foreground = if (peer.online) JBColor(0x2E8B57, 0x6BB76B) else JBColor.GRAY
+        if (peer.online) {
+            statusLabel.text = "● online"
+            statusLabel.foreground = JBColor(0x2E8B57, 0x6BB76B)
+        } else {
+            // Look the peer up in the live presence list to read its lastSeen
+            // (PeerEntry deliberately doesn't carry it — combo stays compact).
+            val lastSeen = service.users.find { it.userId == peer.userId }?.lastSeen
+            statusLabel.text = "○ son görülme: ${formatLastSeen(lastSeen)}"
+            statusLabel.foreground = JBColor.GRAY
+        }
         updateSendEnabled()
     }
 
     private fun updateSendEnabled() {
         val peer = currentPeer()
-        val ready = peer != null && peer.userId.isNotBlank() && peer.online && service.isConnected
+        val hasPeer = peer != null && peer.userId.isNotBlank()
+        val ready = hasPeer && peer!!.online && service.isConnected
         sendButton.isEnabled = ready
         inputField.isEnabled = ready
         inputField.toolTipText = when {
             !service.isConnected -> "Sunucuya bağlı değilsin"
-            peer == null || peer.userId.isBlank() -> "Önce birini seç"
-            !peer.online -> "${peer.name} şu an offline"
+            !hasPeer -> "Önce birini seç"
+            peer != null && !peer.online -> "${peer.name} şu an offline"
             else -> null
+        }
+        refreshBanner()
+    }
+
+    private fun refreshBanner() {
+        val peer = currentPeer()
+        val text = when {
+            !service.isConnected -> "Sunucuya bağlı değilsin, mesaj gönderilemez."
+            peer == null || peer.userId.isBlank() -> null
+            !peer.online -> "${peer.name} şu an offline — gönderdiğin mesaj ulaşmaz."
+            else -> null
+        }
+        if (text != null) {
+            banner.text = "⚠  $text"
+            banner.isVisible = true
+        } else {
+            banner.isVisible = false
         }
     }
 
