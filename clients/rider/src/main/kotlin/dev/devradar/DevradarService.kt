@@ -21,7 +21,9 @@ import java.net.http.HttpClient
 import java.net.http.WebSocket
 import java.security.MessageDigest
 import java.time.Duration
+import java.util.UUID
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -39,6 +41,24 @@ data class DevradarUser(
     val status: String,
     val lastSeen: Long?,
 )
+
+data class ChatMessage(
+    val id: String,
+    val from: String,
+    val fromName: String,
+    val to: String,
+    val text: String,
+    val ts: Long,
+    val self: Boolean,
+)
+
+interface DevradarChatListener {
+    fun onChat(msg: ChatMessage)
+    fun onChatAck(id: String, ts: Long)
+    fun onChatError(id: String, reason: String)
+    fun onConnectionChanged(connected: Boolean)
+    fun onPresenceChanged()
+}
 
 @Service(Service.Level.PROJECT)
 class DevradarService(private val project: Project) : Disposable {
@@ -68,6 +88,40 @@ class DevradarService(private val project: Project) : Disposable {
     @Volatile var users: List<DevradarUser> = emptyList()
         private set
 
+    val selfUserId: String get() = selfId
+    val selfUserName: String get() = userName
+    val isConnected: Boolean get() = ws != null
+
+    private val chatListeners = CopyOnWriteArrayList<DevradarChatListener>()
+
+    fun addChatListener(l: DevradarChatListener) {
+        chatListeners.add(l)
+        // Replay current state to the newly attached listener so it doesn't have
+        // to wait for the next event to render correctly.
+        safeNotify { l.onConnectionChanged(ws != null) }
+        if (users.isNotEmpty()) safeNotify { l.onPresenceChanged() }
+    }
+    fun removeChatListener(l: DevradarChatListener) { chatListeners.remove(l) }
+
+    /**
+     * Send a chat message to [toUserId]. Returns the generated message id so the
+     * caller can correlate the optimistic local bubble with the eventual server
+     * ack / error. Returns null only if the WebSocket isn't open right now —
+     * caller should display "bağlı değil" in that case.
+     */
+    fun sendChat(toUserId: String, text: String): String? {
+        val socket = ws ?: return null
+        val id = "c_" + UUID.randomUUID().toString().replace("-", "").take(16)
+        val payload = mapOf(
+            "type" to "chat",
+            "to" to toUserId,
+            "text" to text,
+            "id" to id,
+        )
+        send(socket, payload)
+        return id
+    }
+
     fun start() {
         project.messageBus.connect(this).subscribe(
             FileEditorManagerListener.FILE_EDITOR_MANAGER,
@@ -84,6 +138,8 @@ class DevradarService(private val project: Project) : Disposable {
         heartbeat?.cancel(false); heartbeat = null
         noRepo = false; probed = false; users = emptyList()
         refreshWidget()
+        if (old != null) fireConnectionChanged(false)
+        chatListeners.forEach { safeNotify { it.onPresenceChanged() } }
         try { old?.sendClose(WebSocket.NORMAL_CLOSURE, "settings changed") } catch (_: Throwable) {}
         connect()
     }
@@ -134,6 +190,7 @@ class DevradarService(private val project: Project) : Disposable {
                             scheduleReconnect(gen)
                         } else {
                             ws = socket
+                            fireConnectionChanged(true)
                         }
                     }
             } catch (t: Throwable) {
@@ -197,6 +254,8 @@ class DevradarService(private val project: Project) : Disposable {
         // empty list until the next presence broadcast arrives.
         users = emptyList()
         refreshWidget()
+        fireConnectionChanged(false)
+        chatListeners.forEach { safeNotify { it.onPresenceChanged() } }
         scheduleReconnect(gen)
     }
 
@@ -208,26 +267,70 @@ class DevradarService(private val project: Project) : Disposable {
     private fun handleMessage(text: String) {
         try {
             val obj = JsonParser.parseString(text).asJsonObject
-            if (obj.get("type")?.asString != "presence") return
-            val arr = obj.getAsJsonArray("users") ?: return
-            users = arr.map { e ->
-                val u = e.asJsonObject
-                fun strOrNull(k: String) = u.get(k)?.takeIf { !it.isJsonNull }?.asString
-                DevradarUser(
-                    userId = strOrNull("userId") ?: "",
-                    userName = strOrNull("userName") ?: "?",
-                    ide = strOrNull("ide") ?: "?",
-                    project = strOrNull("project") ?: "?",
-                    file = strOrNull("file"),
-                    line = u.get("line")?.takeIf { !it.isJsonNull }?.asInt,
-                    status = strOrNull("status") ?: "offline",
-                    lastSeen = u.get("lastSeen")?.takeIf { !it.isJsonNull }?.asLong,
-                )
+            fun strOrNull(k: String, src: com.google.gson.JsonObject = obj) =
+                src.get(k)?.takeIf { !it.isJsonNull }?.asString
+
+            when (obj.get("type")?.asString) {
+                "presence" -> {
+                    val arr = obj.getAsJsonArray("users") ?: return
+                    users = arr.map { e ->
+                        val u = e.asJsonObject
+                        DevradarUser(
+                            userId = strOrNull("userId", u) ?: "",
+                            userName = strOrNull("userName", u) ?: "?",
+                            ide = strOrNull("ide", u) ?: "?",
+                            project = strOrNull("project", u) ?: "?",
+                            file = strOrNull("file", u),
+                            line = u.get("line")?.takeIf { !it.isJsonNull }?.asInt,
+                            status = strOrNull("status", u) ?: "offline",
+                            lastSeen = u.get("lastSeen")?.takeIf { !it.isJsonNull }?.asLong,
+                        )
+                    }
+                    refreshWidget()
+                    chatListeners.forEach { safeNotify { it.onPresenceChanged() } }
+                }
+                "chat" -> {
+                    val from = strOrNull("from") ?: return
+                    val to = strOrNull("to") ?: return
+                    val text2 = strOrNull("text") ?: return
+                    val id = strOrNull("id") ?: return
+                    val fromName = strOrNull("fromName") ?: "?"
+                    val ts = obj.get("ts")?.takeIf { !it.isJsonNull }?.asLong ?: System.currentTimeMillis()
+                    val msg = ChatMessage(
+                        id = id,
+                        from = from,
+                        fromName = fromName,
+                        to = to,
+                        text = text2,
+                        ts = ts,
+                        self = from == selfId,
+                    )
+                    chatListeners.forEach { safeNotify { it.onChat(msg) } }
+                }
+                "chat-ack" -> {
+                    val id = strOrNull("id") ?: return
+                    val ts = obj.get("ts")?.takeIf { !it.isJsonNull }?.asLong ?: System.currentTimeMillis()
+                    chatListeners.forEach { safeNotify { it.onChatAck(id, ts) } }
+                }
+                "chat-error" -> {
+                    val id = strOrNull("id") ?: return
+                    val reason = strOrNull("reason") ?: "unknown"
+                    chatListeners.forEach { safeNotify { it.onChatError(id, reason) } }
+                }
+                "error" -> log.warn("devradar: server error: ${strOrNull("message")}")
+                else -> { /* ignore unknown types */ }
             }
-            refreshWidget()
         } catch (t: Throwable) {
             log.debug("devradar: bad message: $text", t)
         }
+    }
+
+    private fun safeNotify(block: () -> Unit) {
+        try { block() } catch (t: Throwable) { log.warn("devradar: chat listener threw", t) }
+    }
+
+    private fun fireConnectionChanged(connected: Boolean) {
+        chatListeners.forEach { safeNotify { it.onConnectionChanged(connected) } }
     }
 
     private fun sendUpdate(file: VirtualFile?) {

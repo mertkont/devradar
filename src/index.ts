@@ -46,7 +46,14 @@ type Attachment = {
   file?: string | null;
   line?: number | null;
   lastSeen: number;
+  // Sliding-window rate limit counters for chat messages from this socket.
+  chatWindowStart?: number;
+  chatCount?: number;
 };
+
+const CHAT_MAX_TEXT = 4096;
+const CHAT_RATE_WINDOW_MS = 10_000;
+const CHAT_RATE_MAX = 15;
 
 type StoredMember = {
   userId: string;
@@ -64,7 +71,8 @@ const ALARM_INTERVAL_MS = 30 * 1000;
 type ClientMsg =
   | { type: "hello"; userId: string; userName: string; ide: string; project: string }
   | { type: "update"; file?: string | null; line?: number | null; project?: string }
-  | { type: "heartbeat" };
+  | { type: "heartbeat" }
+  | { type: "chat"; to: string; text: string; id: string };
 
 export class PresenceRoom implements DurableObject {
   constructor(private ctx: DurableObjectState) {}
@@ -151,8 +159,85 @@ export class PresenceRoom implements DurableObject {
       return;
     }
 
+    if (msg.type === "chat") {
+      this.handleChat(ws, att, msg, now);
+      return;
+    }
+
     // heartbeat: just persist the refreshed lastSeen.
     ws.serializeAttachment(att);
+  }
+
+  // Real-time 1-to-1 chat within a room. The server is the source of truth for
+  // "from" — we ignore whatever the client puts there and stamp the sender's
+  // userId from the socket's own attachment. That alone prevents the simplest
+  // form of impersonation (a client claiming to be someone else inside the
+  // same room). It does NOT prevent cross-IDE impersonation by someone who
+  // controls a teammate's git email, but neither does the rest of devradar —
+  // identity is intentionally derived from git for zero-config UX.
+  private handleChat(
+    ws: WebSocket,
+    att: Attachment,
+    msg: { to: string; text: string; id: string },
+    now: number,
+  ): void {
+    // --- input validation ---
+    if (typeof msg.to !== "string" || typeof msg.text !== "string" || typeof msg.id !== "string") return;
+    const to = msg.to.slice(0, 128);
+    const id = msg.id.slice(0, 64);
+    const text = String(msg.text).slice(0, CHAT_MAX_TEXT).trim();
+    if (!text) return;
+    if (to === att.userId) return; // no echo-chat to self
+
+    // --- rate limiting (sliding window per socket) ---
+    const winStart = att.chatWindowStart ?? 0;
+    if (now - winStart > CHAT_RATE_WINDOW_MS) {
+      att.chatWindowStart = now;
+      att.chatCount = 1;
+    } else {
+      att.chatCount = (att.chatCount ?? 0) + 1;
+      if (att.chatCount > CHAT_RATE_MAX) {
+        ws.serializeAttachment(att);
+        try { ws.send(JSON.stringify({ type: "chat-error", id, reason: "rate-limited" })); } catch {}
+        return;
+      }
+    }
+    ws.serializeAttachment(att);
+
+    // --- find recipient sockets and sender's other sockets in this room ---
+    const recipients: WebSocket[] = [];
+    const senderEchoes: WebSocket[] = [];
+    for (const s of this.ctx.getWebSockets()) {
+      const a = s.deserializeAttachment() as Attachment | null;
+      if (!a) continue;
+      if (now - (a.lastSeen ?? 0) > STALE_SOCKET_MS) continue;
+      if (a.userId === to) recipients.push(s);
+      else if (a.userId === att.userId && s !== ws) senderEchoes.push(s);
+    }
+
+    if (recipients.length === 0) {
+      try { ws.send(JSON.stringify({ type: "chat-error", id, reason: "offline" })); } catch {}
+      return;
+    }
+
+    const relay = JSON.stringify({
+      type: "chat",
+      from: att.userId,
+      fromName: att.userName,
+      to,
+      text,
+      id,
+      ts: now,
+    });
+    for (const r of recipients) {
+      try { r.send(relay); } catch { /* socket closing */ }
+    }
+    for (const s of senderEchoes) {
+      try { s.send(relay); } catch { /* socket closing */ }
+    }
+    try {
+      ws.send(JSON.stringify({ type: "chat-ack", id, ts: now }));
+    } catch { /* ignore */ }
   }
 
   private async touchMember(userId: string, now: number): Promise<void> {

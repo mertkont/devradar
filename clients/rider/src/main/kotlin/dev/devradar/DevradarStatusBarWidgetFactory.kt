@@ -34,21 +34,39 @@ class DevradarStatusBarWidget(private val project: Project) :
 
     override fun getClickConsumer(): Consumer<MouseEvent> = Consumer { e ->
         val svc = DevradarService.getInstance(project)
-        val rows = svc.users
+        // Build parallel lists: a label for display, and the user behind each row
+        // (or null when the row is just informational — own entry, "no data").
+        val sorted = svc.users
             .sortedWith(compareByDescending<DevradarUser> { it.status == "online" }.thenBy { it.userName })
-            .map { u ->
-                val dot = if (u.status == "online") "● " else "○ "
-                val where = if (u.status == "online") {
-                    u.ide + (u.file?.let { " · $it" } ?: "")
-                } else {
-                    "offline · son görülme: ${formatLastSeen(u.lastSeen)}"
-                }
-                "$dot${u.userName}  —  $where"
+        val rows = mutableListOf<String>()
+        val peers = mutableListOf<DevradarUser?>()
+        for (u in sorted) {
+            val dot = if (u.status == "online") "● " else "○ "
+            val where = if (u.status == "online") {
+                u.ide + (u.file?.let { " · $it" } ?: "")
+            } else {
+                "offline · son görülme: ${formatLastSeen(u.lastSeen)}"
             }
-        val items = rows.ifEmpty { listOf("(henüz veri yok)") }
+            val suffix = if (u.userId == svc.selfUserId) "   (sen)"
+            else if (u.status == "online") "   →  💬 sohbet"
+            else ""
+            rows.add("$dot${u.userName}  —  $where$suffix")
+            peers.add(u)
+        }
+        if (rows.isEmpty()) {
+            rows.add("(henüz veri yok)")
+            peers.add(null)
+        }
         JBPopupFactory.getInstance()
-            .createPopupChooserBuilder(items)
-            .setTitle("devradar — kim, nerede")
+            .createPopupChooserBuilder(rows)
+            .setTitle("devradar — birine tıkla → sohbet")
+            .setItemChosenCallback { chosen ->
+                val idx = rows.indexOf(chosen)
+                val peer = peers.getOrNull(idx) ?: return@setItemChosenCallback
+                if (peer.userId == svc.selfUserId) return@setItemChosenCallback
+                if (peer.status != "online") return@setItemChosenCallback
+                DevradarChatToolWindowFactory.open(project, peer.userId)
+            }
             .createPopup()
             .show(RelativePoint(e))
     }

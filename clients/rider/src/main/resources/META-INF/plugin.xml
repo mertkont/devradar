@@ -30,6 +30,11 @@
                                  id="dev.devradar.settings"
                                  displayName="devradar"
                                  instance="dev.devradar.DevradarConfigurable"/>
+        <toolWindow id="devradar Chat"
+                    anchor="right"
+                    secondary="false"
+                    icon="AllIcons.Toolwindows.ToolWindowMessages"
+                    factoryClass="dev.devradar.DevradarChatToolWindowFactory"/>
     </extensions>
 
     <actions>
@@ -37,6 +42,12 @@
                 class="dev.devradar.DevradarReconnectAction"
                 text="devradar: Yeniden Bağlan"
                 description="Reconnect devradar's presence WebSocket">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action id="devradar.OpenChat"
+                class="dev.devradar.DevradarOpenChatAction"
+                text="devradar: Sohbet Aç"
+                description="Open the devradar chat tool window">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>

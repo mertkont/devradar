@@ -2,7 +2,7 @@
   "name": "devradar-vscode",
   "displayName": "devradar — kim online",
   "description": "Hangi takım arkadaşın şu an aynı repoda kod yazıyor — IDE'den bağımsız presence",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "publisher": "MertKont",
   "license": "GPL-3.0-or-later",
   "repository": {
@@ -44,7 +44,8 @@
     },
     "commands": [
       { "command": "devradar.showPeers", "title": "devradar: Kimler online?" },
-      { "command": "devradar.reconnect", "title": "devradar: Yeniden bağlan" }
+      { "command": "devradar.reconnect", "title": "devradar: Yeniden bağlan" },
+      { "command": "devradar.openChat", "title": "devradar: Sohbet aç" }
     ]
   },
   "scripts": {
