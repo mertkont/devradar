@@ -50,6 +50,11 @@ class DevradarService(private val project: Project) : Disposable {
         .build()
     private val exec = AppExecutorUtil.getAppScheduledExecutorService()
     private val disposed = AtomicBoolean(false)
+    // Java's WebSocket API requires sendText() calls to be serialized — a second
+    // sendText before the previous Future completes throws IllegalStateException.
+    // We may call send() from several threads (heartbeat tick, file-change handler,
+    // onOpen). One lock per service is enough; messages are tiny and infrequent.
+    private val sendLock = Any()
 
     @Volatile private var generation = 0
     @Volatile private var ws: WebSocket? = null
@@ -111,18 +116,26 @@ class DevradarService(private val project: Project) : Disposable {
                 refreshWidget()
 
                 val uri = URI.create("${settings.serverUrl}?room=${URLEncoder.encode(roomKey, "UTF-8")}")
-                httpClient.newWebSocketBuilder().buildAsync(uri, Listener(gen)).whenComplete { socket, err ->
-                    if (gen != generation) {
-                        try { socket?.sendClose(WebSocket.NORMAL_CLOSURE, "superseded") } catch (_: Throwable) {}
-                        return@whenComplete
+                // Explicit connect timeout for the WS handshake, plus an overall
+                // orTimeout so a stuck future (after macOS sleep/wake the underlying
+                // HttpClient state can hang silently) can never block the reconnect
+                // chain forever — TimeoutException routes us back to scheduleReconnect.
+                httpClient.newWebSocketBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .buildAsync(uri, Listener(gen))
+                    .orTimeout(15, TimeUnit.SECONDS)
+                    .whenComplete { socket, err ->
+                        if (gen != generation) {
+                            try { socket?.sendClose(WebSocket.NORMAL_CLOSURE, "superseded") } catch (_: Throwable) {}
+                            return@whenComplete
+                        }
+                        if (err != null) {
+                            log.warn("devradar: connect failed: ${err.message}")
+                            scheduleReconnect(gen)
+                        } else {
+                            ws = socket
+                        }
                     }
-                    if (err != null) {
-                        log.warn("devradar: connect failed: ${err.message}")
-                        scheduleReconnect(gen)
-                    } else {
-                        ws = socket
-                    }
-                }
             } catch (t: Throwable) {
                 log.warn("devradar: connect error", t)
                 scheduleReconnect(gen)
@@ -179,6 +192,10 @@ class DevradarService(private val project: Project) : Disposable {
         if (gen != generation) return
         ws = null
         heartbeat?.cancel(false); heartbeat = null
+        // Stale presence data would otherwise stay visible in the click-popup while
+        // the widget itself says "bağlanıyor…". Drop it so users see a truthful
+        // empty list until the next presence broadcast arrives.
+        users = emptyList()
         refreshWidget()
         scheduleReconnect(gen)
     }
@@ -231,7 +248,9 @@ class DevradarService(private val project: Project) : Disposable {
         val json = gson.toJson(payload)
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                socket.sendText(json, true).get(3, TimeUnit.SECONDS)
+                synchronized(sendLock) {
+                    socket.sendText(json, true).get(3, TimeUnit.SECONDS)
+                }
             } catch (t: Throwable) {
                 log.debug("devradar: send failed", t)
             }

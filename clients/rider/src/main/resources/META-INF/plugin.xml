@@ -31,4 +31,13 @@
                                  displayName="devradar"
                                  instance="dev.devradar.DevradarConfigurable"/>
     </extensions>
+
+    <actions>
+        <action id="devradar.Reconnect"
+                class="dev.devradar.DevradarReconnectAction"
+                text="devradar: Yeniden Bağlan"
+                description="Reconnect devradar's presence WebSocket">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>

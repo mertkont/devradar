@@ -138,7 +138,12 @@ async function connect() {
 
   let socket: WebSocket;
   try {
-    socket = new WebSocket(`${serverUrl}?room=${encodeURIComponent(room.roomKey)}`);
+    // Explicit 10s handshake timeout: defends against the macOS sleep/wake case
+    // where the underlying TCP/TLS state is half-broken and the open phase would
+    // otherwise hang silently, breaking the reconnect chain.
+    socket = new WebSocket(`${serverUrl}?room=${encodeURIComponent(room.roomKey)}`, {
+      handshakeTimeout: 10_000,
+    });
   } catch {
     scheduleReconnect();
     return;
@@ -175,7 +180,12 @@ async function connect() {
 
   socket.on("close", () => {
     if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = undefined; }
-    if (ws === socket) ws = undefined;
+    if (ws === socket) {
+      ws = undefined;
+      // Drop stale presence data so the QuickPick doesn't keep showing the
+      // pre-disconnect "online" peers while the status bar says we're not connected.
+      users = [];
+    }
     setStatus("$(circle-slash) devradar: bağlı değil", "Yeniden bağlanmayı deniyor…");
     scheduleReconnect();
   });
