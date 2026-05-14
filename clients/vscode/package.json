@@ -2,7 +2,7 @@
   "name": "devradar-vscode",
   "displayName": "devradar — kim online",
   "description": "Hangi takım arkadaşın şu an aynı repoda kod yazıyor — IDE'den bağımsız presence",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "MertKont",
   "license": "GPL-3.0-or-later",
   "repository": {

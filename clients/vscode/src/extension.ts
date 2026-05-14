@@ -369,6 +369,7 @@ function notifyChatPanelsOfPresence() {
       type: "presence",
       online: peer?.status === "online",
       peerName: peer?.userName,
+      lastSeen: peer?.lastSeen ?? null,
     });
   }
 }
@@ -417,6 +418,7 @@ function openChatWith(peer: PresenceUser) {
     type: "presence",
     online: peer.status === "online",
     peerName: peer.userName,
+    lastSeen: peer.lastSeen ?? null,
   });
   panel.webview.postMessage({ type: "connection", connected: ws?.readyState === WebSocket.OPEN });
 }
@@ -496,11 +498,27 @@ function chatHtml(webview: vscode.Webview, peer: PresenceUser): string {
 
   let online = ${peer.status === "online" ? "true" : "false"};
   let connected = false;
+  let lastSeen = ${typeof peer.lastSeen === "number" ? String(peer.lastSeen) : "null"};
   const seen = new Set();
+
+  function fmtLastSeen(ts) {
+    if (!ts || !isFinite(ts)) return 'uzun süre önce';
+    const ageMs = Math.max(0, Date.now() - ts);
+    const sec = Math.floor(ageMs / 1000);
+    if (sec < 60) return 'az önce';
+    const min = Math.floor(sec / 60);
+    if (min < 60) return min + ' dk önce';
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return hr + ' sa önce';
+    const day = Math.floor(hr / 24);
+    if (day < 7) return day + ' gün önce';
+    if (day < 30) return Math.floor(day / 7) + ' hafta önce';
+    return 'uzun süre önce';
+  }
 
   function refreshState() {
     header.classList.toggle('online', online);
-    statusText.textContent = online ? 'online' : 'offline';
+    statusText.textContent = online ? 'online' : ('son görülme: ' + fmtLastSeen(lastSeen));
     let banText = '';
     if (!connected) banText = 'Sunucuya bağlı değilsin, mesaj gönderilemez.';
     else if (!online) banText = peerName + ' şu an offline — gönderdiğin mesaj ulaşmaz.';
@@ -578,6 +596,7 @@ function chatHtml(webview: vscode.Webview, peer: PresenceUser): string {
     if (!m) return;
     if (m.type === 'presence') {
       online = !!m.online;
+      if (m.lastSeen != null && typeof m.lastSeen === 'number') lastSeen = m.lastSeen;
       refreshState();
     } else if (m.type === 'connection') {
       connected = !!m.connected;
