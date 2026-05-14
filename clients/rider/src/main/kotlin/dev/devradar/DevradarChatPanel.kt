@@ -220,12 +220,13 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
                             failed = null,
                         ),
                     )
-                    if (!msg.self && currentPeer()?.userId != peerId) {
-                        // Auto-switch to the peer who just messaged so the user sees it.
-                        // (Optional UX: comment out if intrusive.)
-                        rebuildPeerCombo(preferUserId = peerId)
-                    }
                 }
+                // Only re-render if the active conversation is this peer.
+                // We intentionally do NOT auto-switch the peer combo here —
+                // (a) during initial buffer replay it would bounce around,
+                // (b) it would clobber the user's current typing context.
+                // Discovery of new conversations happens via the notification
+                // balloon that DevradarChatNotifier raises.
                 if (currentPeer()?.userId == peerId) renderConversation()
             }
         }

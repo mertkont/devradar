@@ -189,10 +189,14 @@ async function connect() {
       routeChatEventToPeer(msg.to, { type: "ack", id: msg.id, ts: msg.ts });
     } else if (msg?.type === "chat-error") {
       // Server rejected the send (recipient offline, rate-limited, etc.).
-      // We don't know the target peer from the error itself, so notify every
-      // open chat panel — the one with the matching id will react.
-      for (const panel of chatPanels.values()) {
-        panel.webview.postMessage({ type: "error", id: msg.id, reason: msg.reason });
+      // Route precisely to the panel whose peer matches msg.to; fall back to
+      // every panel for older servers that omit the `to` field.
+      if (typeof msg.to === "string") {
+        routeChatEventToPeer(msg.to, { type: "error", id: msg.id, reason: msg.reason });
+      } else {
+        for (const panel of chatPanels.values()) {
+          panel.webview.postMessage({ type: "error", id: msg.id, reason: msg.reason });
+        }
       }
     } else if (msg?.type === "error") {
       vscode.window.showErrorMessage(`devradar: ${msg.message ?? "bilinmeyen hata"}`);
@@ -435,7 +439,6 @@ function chatHtml(webview: vscode.Webview, peer: PresenceUser): string {
     `img-src ${webview.cspSource} data:`,
   ].join("; ");
   const peerNameSafe = escapeHtml(peer.userName);
-  const selfNameSafe = escapeHtml(selfName);
 
   return /* html */ `<!DOCTYPE html>
 <html lang="tr">
@@ -487,8 +490,9 @@ function chatHtml(webview: vscode.Webview, peer: PresenceUser): string {
   const header = document.getElementById('header');
   const statusText = document.getElementById('statusText');
   const banner = document.getElementById('banner');
+  // Raw names (not HTML-escaped) — webview JS renders via textContent only.
   const peerName = ${JSON.stringify(peer.userName)};
-  const selfName = ${JSON.stringify(selfNameSafe)};
+  const selfName = ${JSON.stringify(selfName)};
 
   let online = ${peer.status === "online" ? "true" : "false"};
   let connected = false;

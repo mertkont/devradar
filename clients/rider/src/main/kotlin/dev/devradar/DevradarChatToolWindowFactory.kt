@@ -25,8 +25,8 @@ class DevradarChatToolWindowFactory : ToolWindowFactory, DumbAware {
          * the ToolWindowManager.
          */
         fun open(project: Project, peerUserId: String? = null) {
-            val mgr = ToolWindowManager.getInstance(project)
-            val tw = mgr.getToolWindow(DEVRADAR_CHAT_TOOL_WINDOW_ID) ?: return
+            if (project.isDisposed) return
+            val tw = ToolWindowManager.getInstance(project).getToolWindow(DEVRADAR_CHAT_TOOL_WINDOW_ID) ?: return
             tw.activate({
                 if (peerUserId != null) {
                     val panel = tw.contentManager.getContent(0)?.component as? DevradarChatPanel

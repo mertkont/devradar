@@ -35,6 +35,7 @@
                     secondary="false"
                     icon="AllIcons.Toolwindows.ToolWindowMessages"
                     factoryClass="dev.devradar.DevradarChatToolWindowFactory"/>
+        <notificationGroup id="devradar.chat" displayType="BALLOON"/>
     </extensions>
 
     <actions>

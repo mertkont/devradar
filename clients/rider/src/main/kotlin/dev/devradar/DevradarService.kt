@@ -93,15 +93,44 @@ class DevradarService(private val project: Project) : Disposable {
     val isConnected: Boolean get() = ws != null
 
     private val chatListeners = CopyOnWriteArrayList<DevradarChatListener>()
+    private val chatBuffer = ArrayDeque<ChatMessage>()
+    private val chatBufferLock = Any()
 
     fun addChatListener(l: DevradarChatListener) {
-        chatListeners.add(l)
-        // Replay current state to the newly attached listener so it doesn't have
-        // to wait for the next event to render correctly.
+        // The add + replay happen inside the same lock that bufferChat() uses,
+        // so a concurrent incoming chat can't slip in between snapshotting the
+        // buffer and adding the listener — otherwise the listener could see
+        // the new message *before* the historic ones during replay and the
+        // resulting transcript order would be wrong. The listener's onChat
+        // typically just invokeLater()s onto the EDT, so the lock is short-lived.
+        synchronized(chatBufferLock) {
+            val replay = chatBuffer.toList()
+            chatListeners.add(l)
+            for (m in replay) safeNotify { l.onChat(m) }
+        }
+        // Connection / presence state is independent of the chat buffer and can
+        // safely happen outside the lock.
         safeNotify { l.onConnectionChanged(ws != null) }
         if (users.isNotEmpty()) safeNotify { l.onPresenceChanged() }
     }
     fun removeChatListener(l: DevradarChatListener) { chatListeners.remove(l) }
+
+    /**
+     * Append [msg] to the in-memory chat buffer and notify all current
+     * listeners — both atomically under [chatBufferLock]. Atomicity matters
+     * because [addChatListener] also runs under the same lock: if a new
+     * listener slips in between the buffer write and the dispatch, it could
+     * receive the same message once from replay and once from live forEach.
+     * Holding the lock for the whole transaction makes those two paths
+     * mutually exclusive.
+     */
+    private fun bufferAndDispatchChat(msg: ChatMessage) {
+        synchronized(chatBufferLock) {
+            chatBuffer.addLast(msg)
+            while (chatBuffer.size > 100) chatBuffer.removeFirst()
+            chatListeners.forEach { safeNotify { it.onChat(msg) } }
+        }
+    }
 
     /**
      * Send a chat message to [toUserId]. Returns the generated message id so the
@@ -305,7 +334,7 @@ class DevradarService(private val project: Project) : Disposable {
                         ts = ts,
                         self = from == selfId,
                     )
-                    chatListeners.forEach { safeNotify { it.onChat(msg) } }
+                    bufferAndDispatchChat(msg)
                 }
                 "chat-ack" -> {
                     val id = strOrNull("id") ?: return

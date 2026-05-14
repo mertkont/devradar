@@ -198,7 +198,7 @@ export class PresenceRoom implements DurableObject {
       att.chatCount = (att.chatCount ?? 0) + 1;
       if (att.chatCount > CHAT_RATE_MAX) {
         ws.serializeAttachment(att);
-        try { ws.send(JSON.stringify({ type: "chat-error", id, reason: "rate-limited" })); } catch {}
+        try { ws.send(JSON.stringify({ type: "chat-error", id, to, reason: "rate-limited" })); } catch {}
         return;
       }
     }
@@ -216,7 +216,7 @@ export class PresenceRoom implements DurableObject {
     }
 
     if (recipients.length === 0) {
-      try { ws.send(JSON.stringify({ type: "chat-error", id, reason: "offline" })); } catch {}
+      try { ws.send(JSON.stringify({ type: "chat-error", id, to, reason: "offline" })); } catch {}
       return;
     }
 
@@ -236,7 +236,7 @@ export class PresenceRoom implements DurableObject {
       try { s.send(relay); } catch { /* socket closing */ }
     }
     try {
-      ws.send(JSON.stringify({ type: "chat-ack", id, ts: now }));
+      ws.send(JSON.stringify({ type: "chat-ack", id, to, ts: now }));
     } catch { /* ignore */ }
   }
 
