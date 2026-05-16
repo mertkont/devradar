@@ -4,7 +4,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 
-// "Tools → devradar: Yeniden Bağlan" — manual escape hatch when the WebSocket
+// "Tools → devradar: Reconnect" — manual escape hatch when the WebSocket
 // is stuck in a half-open state (e.g. after macOS sleep/wake) and the user
 // doesn't want to restart the whole IDE.
 class DevradarReconnectAction : AnAction() {

@@ -41,13 +41,13 @@
     <actions>
         <action id="devradar.Reconnect"
                 class="dev.devradar.DevradarReconnectAction"
-                text="devradar: Yeniden Bağlan"
+                text="devradar: Reconnect"
                 description="Reconnect devradar's presence WebSocket">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
         <action id="devradar.OpenChat"
                 class="dev.devradar.DevradarOpenChatAction"
-                text="devradar: Sohbet Aç"
+                text="devradar: Open Chat"
                 description="Open the devradar chat tool window">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>

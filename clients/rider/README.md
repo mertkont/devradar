@@ -1,53 +1,39 @@
-# devradar — JetBrains eklentisi (Rider, IntelliJ, PyCharm, …)
+# devradar — JetBrains plugin (Rider, IntelliJ, PyCharm, …)
 
-VS Code eklentisinin JetBrains karşılığı. Aynı git reposunu açan takım arkadaşlarının
-şu an kod yazıp yazmadığını durum çubuğunda gösterir. Sıfır ayar — kimlik git'ten, oda
-repodan.
+The JetBrains counterpart to the VS Code extension. Shows in the status bar which teammates have the same git repo open and are coding right now, and lets you chat with them 1-to-1 inside the IDE. Zero configuration — identity from git, room from the repo URL.
 
-IntelliJ Platform üzerine kurulu olduğu için Rider, IntelliJ IDEA, PyCharm, GoLand,
-WebStorm vb. hepsinde çalışır (plugin sadece genel platform API'lerini kullanır).
+Built on the IntelliJ Platform, so it runs in Rider, IntelliJ IDEA, PyCharm, GoLand, WebStorm, and friends (the plugin only uses generic platform APIs).
 
-## Geliştirme / derleme
+## Development / build
 
-Gradle wrapper repoda gömülü. Build için **JDK 17–21** gerekir.
+The Gradle wrapper is committed. Building requires **JDK 17–21**.
 
 ```bash
 cd clients/rider
-./gradlew buildPlugin        # build/distributions/devradar-0.1.0.zip üretir
-./gradlew runIde             # eklentiyi geçici bir IDE sandbox'ında açar (deneme için)
+./gradlew buildPlugin        # produces build/distributions/devradar-rider-<version>.zip
+./gradlew runIde             # opens the plugin in a sandbox IDE (for trying it out)
 ```
 
-> **JDK 23+ kullanıyorsan**: Gradle 8.10 + Kotlin DSL JDK 25'i tanımıyor. Build'i
-> bir JDK 17–21 ile çalıştır:
+> **If you're on JDK 23+:** Gradle 8.10 + Kotlin DSL doesn't recognise JDK 25. Build with a JDK 17–21:
 > ```bash
-> JAVA_HOME="/JDK17-21/yolun" ./gradlew buildPlugin
+> JAVA_HOME="/path/to/jdk-17-to-21" ./gradlew buildPlugin
 > ```
-> Herhangi bir JetBrains IDE veya Android Studio kuruluysa içinde gömülü bir JBR 21 vardır
-> (`/Applications/Android Studio.app/Contents/jbr/Contents/Home` gibi) — onu kullanabilirsin.
-> (Alternatif: wrapper'ı Gradle 9.1+'a yükseltmek de sorunu çözer.)
+> Any installed JetBrains IDE or Android Studio bundles a JBR 21 (e.g. `/Applications/Android Studio.app/Contents/jbr/Contents/Home`) which works.
+> (Alternatively, upgrading the wrapper to Gradle 9.1+ also fixes it.)
 
-`runIde` ilk seferde bir IDE indirir (büyük). Gerçek Rider'ında denemek için:
-**Settings → Plugins → ⚙ → Install Plugin from Disk…** → `build/distributions/devradar-0.1.0.zip`.
+`runIde` downloads an IDE on first run (large). To try the plugin in your real Rider:
+**Settings → Plugins → ⚙ → Install Plugin from Disk…** → pick the built `.zip`.
 
-## JetBrains Marketplace'e publish
+## Publishing to the JetBrains Marketplace
 
-1. https://plugins.jetbrains.com → "Sign In" (JetBrains hesabı) → ilk kez bir **vendor profili** oluştur.
-2. **Upload plugin** → `build/distributions/devradar-0.1.0.zip` dosyasını yükle. İlk gönderim
-   JetBrains tarafından incelenir (birkaç gün sürebilir).
-3. CLI ile de yapılabilir: bir **permanent token** al (Marketplace → profil → "My Tokens"),
-   sonra:
+1. https://plugins.jetbrains.com → "Sign In" with a JetBrains account → create a **vendor profile** (first time only).
+2. **Upload plugin** → drop the built `.zip`. First submission is reviewed by JetBrains (can take a few days).
+3. Can also be done via CLI: get a **permanent token** (Marketplace → profile → "My Tokens"), then:
    ```bash
    ./gradlew publishPlugin -Ppublish.token=<TOKEN>
    ```
-   (Bunun için `build.gradle.kts`'e `publishing { token = ... }` bloğu eklenir — ilk
-   yüklemeyi web'den yapıp pluginId aldıktan sonra.)
+   (This requires a `publishing { token = ... }` block in `build.gradle.kts` — set up after the first web upload yields a pluginId.)
 
-## Sunucu
+## Server
 
-Açık kaynak, Cloudflare Workers + Durable Objects: https://github.com/mertkont/devradar
-
-## Notlar / şimdilik eksikler
-
-- Sunucu adresi şu an sabit (`DevradarService.kt` içinde). Özel sunucu için kendin değiştir;
-  ileride bir Settings paneli eklenebilir (VS Code tarafında zaten ayar var).
-- `devradar.teamKey` (gizlilik anahtarı) bu sürümde yok — repo adresi tek başına oda anahtarı.
+Open source, Cloudflare Workers + Durable Objects: https://github.com/mertkont/devradar

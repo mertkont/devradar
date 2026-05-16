@@ -1,6 +1,6 @@
 import { WebSocket } from "ws";
 
-// wrangler dev varsayılan olarak http://localhost:8787 dinler
+// wrangler dev listens on http://localhost:8787 by default
 const BASE = process.env.DEVRADAR_URL ?? "ws://localhost:8787/ws";
 const ROOM = process.env.DEVRADAR_ROOM ?? "test-room";
 const URL = `${BASE}?room=${encodeURIComponent(ROOM)}`;

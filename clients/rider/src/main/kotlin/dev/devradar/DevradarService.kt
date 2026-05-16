@@ -136,7 +136,7 @@ class DevradarService(private val project: Project) : Disposable {
      * Send a chat message to [toUserId]. Returns the generated message id so the
      * caller can correlate the optimistic local bubble with the eventual server
      * ack / error. Returns null only if the WebSocket isn't open right now —
-     * caller should display "bağlı değil" in that case.
+     * caller should display "not connected" in that case.
      */
     fun sendChat(toUserId: String, text: String): String? {
         val socket = ws ?: return null
@@ -279,7 +279,7 @@ class DevradarService(private val project: Project) : Disposable {
         ws = null
         heartbeat?.cancel(false); heartbeat = null
         // Stale presence data would otherwise stay visible in the click-popup while
-        // the widget itself says "bağlanıyor…". Drop it so users see a truthful
+        // the widget itself says "connecting…". Drop it so users see a truthful
         // empty list until the next presence broadcast arrives.
         users = emptyList()
         refreshWidget()
@@ -396,18 +396,18 @@ class DevradarService(private val project: Project) : Disposable {
     }
 
     fun statusText(): String = when {
-        noRepo -> "devradar: repo yok"
+        noRepo -> "devradar: no repo"
         !probed -> "devradar: …"
-        ws == null -> "devradar: bağlanıyor…"
+        ws == null -> "devradar: connecting…"
         else -> "devradar: ${users.count { it.status == "online" }} online"
     }
 
     fun tooltipText(): String {
-        if (noRepo) return "Bu projenin git remote'u yok — devradar repo bazlı çalışır."
+        if (noRepo) return "This project has no git remote — devradar is repo-based."
         val others = users.filter { it.status == "online" && it.userId != selfId }
         return buildString {
             append("Repo: ").append(projectLabel)
-            if (others.isEmpty()) append("\nŞu an bu repoda tek başınasın.")
+            if (others.isEmpty()) append("\nYou're alone in this repo right now.")
             else others.forEach { u ->
                 append("\n• ").append(u.userName).append(" — ").append(u.ide)
                 if (u.file != null) append(" · ").append(u.file)
@@ -464,16 +464,16 @@ private fun sha256Short(s: String): String =
         .joinToString("") { "%02x".format(it) }.take(16)
 
 fun formatLastSeen(ts: Long?): String {
-    if (ts == null || ts <= 0) return "uzun süre önce"
+    if (ts == null || ts <= 0) return "a long time ago"
     val age = (System.currentTimeMillis() - ts).coerceAtLeast(0L)
     val sec = age / 1000
-    if (sec < 60) return "az önce"
+    if (sec < 60) return "just now"
     val min = sec / 60
-    if (min < 60) return "$min dk önce"
+    if (min < 60) return "$min min ago"
     val hr = min / 60
-    if (hr < 24) return "$hr sa önce"
+    if (hr < 24) return "$hr h ago"
     val day = hr / 24
-    if (day < 7) return "$day gün önce"
-    if (day < 30) return "${day / 7} hafta önce"
-    return "uzun süre önce"
+    if (day < 7) return "$day d ago"
+    if (day < 30) return "${day / 7} w ago"
+    return "a long time ago"
 }

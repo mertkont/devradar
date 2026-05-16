@@ -29,7 +29,7 @@ let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 let updateDebounce: ReturnType<typeof setTimeout> | undefined;
 let stopped = false;
 let selfId = "";
-let selfName = "Sen";
+let selfName = "You";
 let extCtx: vscode.ExtensionContext;
 
 // One webview panel per peer userId; opening a chat with the same peer twice
@@ -128,14 +128,14 @@ async function connect() {
 
   const { serverUrl } = cfg();
   if (!serverUrl) {
-    setStatus("$(warning) devradar: sunucu adresi yok", "Ayarlar → devradar.serverUrl");
+    setStatus("$(warning) devradar: no server URL", "Settings → devradar.serverUrl");
     return;
   }
 
   const folder = workspaceFolder();
   const [identity, room] = await Promise.all([resolveIdentity(folder), resolveRoom(folder)]);
   if (!room) {
-    setStatus("$(circle-slash) devradar: repo yok", "Bu klasörün bir git remote'u yok — devradar repo bazlı çalışır.");
+    setStatus("$(circle-slash) devradar: no repo", "This folder has no git remote — devradar is repo-based.");
     return;
   }
   currentRoom = room;
@@ -154,7 +154,7 @@ async function connect() {
     return;
   }
   ws = socket;
-  setStatus("$(broadcast) devradar: bağlanıyor…", room.projectLabel);
+  setStatus("$(broadcast) devradar: connecting…", room.projectLabel);
 
   socket.on("open", () => {
     if (ws !== socket) return;
@@ -199,7 +199,7 @@ async function connect() {
         }
       }
     } else if (msg?.type === "error") {
-      vscode.window.showErrorMessage(`devradar: ${msg.message ?? "bilinmeyen hata"}`);
+      vscode.window.showErrorMessage(`devradar: ${msg.message ?? "unknown error"}`);
     }
   });
 
@@ -212,7 +212,7 @@ async function connect() {
       users = [];
       notifyChatPanelsOfConnection(false);
     }
-    setStatus("$(circle-slash) devradar: bağlı değil", "Yeniden bağlanmayı deniyor…");
+    setStatus("$(circle-slash) devradar: disconnected", "Trying to reconnect…");
     scheduleReconnect();
   });
 
@@ -249,18 +249,18 @@ function scheduleUpdate() {
 }
 
 function formatLastSeen(ts: number | undefined): string {
-  if (!ts || !Number.isFinite(ts)) return "uzun süre önce";
+  if (!ts || !Number.isFinite(ts)) return "a long time ago";
   const ageMs = Math.max(0, Date.now() - ts);
   const sec = Math.floor(ageMs / 1000);
-  if (sec < 60) return "az önce";
+  if (sec < 60) return "just now";
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} dk önce`;
+  if (min < 60) return `${min} min ago`;
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} sa önce`;
+  if (hr < 24) return `${hr} h ago`;
   const day = Math.floor(hr / 24);
-  if (day < 7) return `${day} gün önce`;
-  if (day < 30) return `${Math.floor(day / 7)} hafta önce`;
-  return "uzun süre önce";
+  if (day < 7) return `${day} d ago`;
+  if (day < 30) return `${Math.floor(day / 7)} w ago`;
+  return "a long time ago";
 }
 
 function setStatus(text: string, tooltip: string | vscode.MarkdownString) {
@@ -277,7 +277,7 @@ function render() {
   tip.appendMarkdown(
     others.length
       ? others.map((u) => `$(circle-filled) **${u.userName}** — ${u.ide}${u.file ? " · `" + u.file + "`" : ""}`).join("\n\n")
-      : "_Şu an bu repoda tek başınasın._",
+      : "_You're alone in this repo right now._",
   );
   tip.supportThemeIcons = true;
   setStatus(`$(broadcast) devradar: ${online.length} online`, tip);
@@ -318,12 +318,12 @@ function handleIncomingChat(msg: {
   // No open panel for this peer — surface a non-intrusive notification.
   vscode.window
     .showInformationMessage(
-      `devradar: ${peerName} sana yazdı — "${truncate(msg.text, 80)}"`,
-      "Aç",
-      "Görmezden gel",
+      `devradar: ${peerName} sent you a message — "${truncate(msg.text, 80)}"`,
+      "Open",
+      "Dismiss",
     )
     .then((choice) => {
-      if (choice !== "Aç") return;
+      if (choice !== "Open") return;
       const peer = users.find((u) => u.userId === peerId);
       const fallback: PresenceUser = peer ?? {
         userId: peerId,
@@ -443,7 +443,7 @@ function chatHtml(webview: vscode.Webview, peer: PresenceUser): string {
   const peerNameSafe = escapeHtml(peer.userName);
 
   return /* html */ `<!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta http-equiv="Content-Security-Policy" content="${csp}" />
@@ -481,8 +481,8 @@ function chatHtml(webview: vscode.Webview, peer: PresenceUser): string {
   <div class="banner hidden" id="banner"></div>
   <div id="log"></div>
   <footer>
-    <textarea id="input" placeholder="Mesaj…" rows="1"></textarea>
-    <button id="send">Gönder</button>
+    <textarea id="input" placeholder="Message…" rows="1"></textarea>
+    <button id="send">Send</button>
   </footer>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
@@ -502,26 +502,26 @@ function chatHtml(webview: vscode.Webview, peer: PresenceUser): string {
   const seen = new Set();
 
   function fmtLastSeen(ts) {
-    if (!ts || !isFinite(ts)) return 'uzun süre önce';
+    if (!ts || !isFinite(ts)) return 'a long time ago';
     const ageMs = Math.max(0, Date.now() - ts);
     const sec = Math.floor(ageMs / 1000);
-    if (sec < 60) return 'az önce';
+    if (sec < 60) return 'just now';
     const min = Math.floor(sec / 60);
-    if (min < 60) return min + ' dk önce';
+    if (min < 60) return min + ' min ago';
     const hr = Math.floor(min / 60);
-    if (hr < 24) return hr + ' sa önce';
+    if (hr < 24) return hr + ' h ago';
     const day = Math.floor(hr / 24);
-    if (day < 7) return day + ' gün önce';
-    if (day < 30) return Math.floor(day / 7) + ' hafta önce';
-    return 'uzun süre önce';
+    if (day < 7) return day + ' d ago';
+    if (day < 30) return Math.floor(day / 7) + ' w ago';
+    return 'a long time ago';
   }
 
   function refreshState() {
     header.classList.toggle('online', online);
-    statusText.textContent = online ? 'online' : ('son görülme: ' + fmtLastSeen(lastSeen));
+    statusText.textContent = online ? 'online' : ('last seen ' + fmtLastSeen(lastSeen));
     let banText = '';
-    if (!connected) banText = 'Sunucuya bağlı değilsin, mesaj gönderilemez.';
-    else if (!online) banText = peerName + ' şu an offline — gönderdiğin mesaj ulaşmaz.';
+    if (!connected) banText = "You're not connected, messages can't be sent.";
+    else if (!online) banText = peerName + " is offline — your message won't be delivered.";
     if (banText) { banner.textContent = banText; banner.classList.remove('hidden'); }
     else banner.classList.add('hidden');
     sendBtn.disabled = !(connected && online);
@@ -562,7 +562,7 @@ function chatHtml(webview: vscode.Webview, peer: PresenceUser): string {
     if (status === 'failed') {
       el.classList.add('failed');
       const meta = el.querySelector('.meta');
-      if (meta) meta.textContent += ' · ' + (reason === 'offline' ? 'alıcı offline' : reason === 'rate-limited' ? 'çok hızlı' : reason === 'disconnected' ? 'bağlı değil' : 'gönderilemedi');
+      if (meta) meta.textContent += ' · ' + (reason === 'offline' ? 'recipient offline' : reason === 'rate-limited' ? 'too fast' : reason === 'disconnected' ? 'not connected' : 'send failed');
     }
   }
 
@@ -619,11 +619,11 @@ function chatHtml(webview: vscode.Webview, peer: PresenceUser): string {
 
 async function showPeers() {
   if (!currentRoom) {
-    vscode.window.showInformationMessage("devradar: bu klasörün git remote'u yok, devradar çalışmıyor.");
+    vscode.window.showInformationMessage("devradar: this folder has no git remote, devradar isn't running.");
     return;
   }
   if (!users.length) {
-    vscode.window.showInformationMessage("devradar: henüz veri yok (bağlanılıyor olabilir).");
+    vscode.window.showInformationMessage("devradar: no data yet (still connecting?).");
     return;
   }
   type Item = vscode.QuickPickItem & { user?: PresenceUser };
@@ -634,20 +634,20 @@ async function showPeers() {
     );
   const items: Item[] = sorted.map((u) => ({
     user: u,
-    label: `${u.status === "online" ? "$(circle-filled)" : "$(circle-outline)"} ${u.userName}${u.userId === selfId ? " (sen)" : ""}`,
+    label: `${u.status === "online" ? "$(circle-filled)" : "$(circle-outline)"} ${u.userName}${u.userId === selfId ? " (you)" : ""}`,
     description:
       u.status === "online"
         ? `${u.ide}${u.file ? " · " + u.file : ""}`
-        : `offline · son görülme: ${formatLastSeen(u.lastSeen)}`,
+        : `offline · last seen ${formatLastSeen(u.lastSeen)}`,
     detail: u.userId === selfId
       ? undefined
       : u.status === "online"
-        ? "$(comment-discussion) Mesajlaş"
-        : "$(comment-discussion) Sohbeti aç (offline)",
+        ? "$(comment-discussion) Open chat"
+        : "$(comment-discussion) Open chat (offline)",
   }));
   const pick = await vscode.window.showQuickPick(items, {
     title: `devradar — ${currentRoom.projectLabel}`,
-    placeHolder: "Birine tıkla → sohbet açılır",
+    placeHolder: "Click someone → chat opens",
   });
   if (pick?.user && pick.user.userId !== selfId) openChatWith(pick.user);
 }
@@ -657,7 +657,7 @@ export function activate(context: vscode.ExtensionContext) {
   stopped = false;
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   statusBar.command = "devradar.showPeers";
-  setStatus("$(broadcast) devradar: başlatılıyor…", "");
+  setStatus("$(broadcast) devradar: starting…", "");
   context.subscriptions.push(statusBar);
 
   context.subscriptions.push(

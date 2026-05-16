@@ -33,7 +33,7 @@ class DevradarChatNotifier(private val project: Project) : DevradarChatListener 
                     /* content = */ preview,
                     NotificationType.INFORMATION,
                 )
-            notification.addAction(NotificationAction.createSimple("Aç") {
+            notification.addAction(NotificationAction.createSimple("Open") {
                 DevradarChatToolWindowFactory.open(project, msg.from)
                 notification.expire()
             })

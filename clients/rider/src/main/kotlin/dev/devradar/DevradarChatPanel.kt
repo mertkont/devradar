@@ -43,7 +43,7 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
         margin = JBUI.insets(4, 6)
     }
     private val inputField = JBTextField()
-    private val sendButton = JButton("Gönder")
+    private val sendButton = JButton("Send")
     // Warning ribbon between header and transcript — visible when the selected
     // peer is offline or the WS is down, so the user understands *why* the
     // input is greyed out. Mirrors the VS Code webview banner.
@@ -101,7 +101,7 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
 
     private fun buildHeader(): JPanel = JPanel(BorderLayout()).apply {
         border = JBUI.Borders.emptyBottom(6)
-        add(JBLabel("Kiminle: "), BorderLayout.WEST)
+        add(JBLabel("With: "), BorderLayout.WEST)
         add(peerCombo, BorderLayout.CENTER)
         val right = JPanel().apply {
             add(Box.createHorizontalStrut(8))
@@ -129,7 +129,7 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
         peerCombo.removeAllItems()
 
         if (entries.isEmpty()) {
-            peerCombo.addItem(PeerEntry("", "(kimse yok)", false))
+            peerCombo.addItem(PeerEntry("", "(nobody yet)", false))
             peerCombo.isEnabled = false
         } else {
             peerCombo.isEnabled = true
@@ -156,7 +156,7 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
         val msgs = conversations[peer.userId] ?: emptyList()
         val sb = StringBuilder()
         for (m in msgs) {
-            val name = if (m.self) "Sen" else m.fromName
+            val name = if (m.self) "You" else m.fromName
             val time = LocalTime.ofInstant(Instant.ofEpochMilli(m.ts), ZoneId.systemDefault()).format(timeFmt)
             sb.append('[').append(time).append("]  ").append(name).append(": ").append(m.text)
             when {
@@ -175,7 +175,7 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
             // Look the peer up in the live presence list to read its lastSeen
             // (PeerEntry deliberately doesn't carry it — combo stays compact).
             val lastSeen = service.users.find { it.userId == peer.userId }?.lastSeen
-            statusLabel.text = "○ son görülme: ${formatLastSeen(lastSeen)}"
+            statusLabel.text = "○ last seen ${formatLastSeen(lastSeen)}"
             statusLabel.foreground = JBColor.GRAY
         }
         updateSendEnabled()
@@ -188,9 +188,9 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
         sendButton.isEnabled = ready
         inputField.isEnabled = ready
         inputField.toolTipText = when {
-            !service.isConnected -> "Sunucuya bağlı değilsin"
-            !hasPeer -> "Önce birini seç"
-            peer != null && !peer.online -> "${peer.name} şu an offline"
+            !service.isConnected -> "Not connected to server"
+            !hasPeer -> "Pick someone first"
+            peer != null && !peer.online -> "${peer.name} is offline"
             else -> null
         }
         refreshBanner()
@@ -199,9 +199,9 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
     private fun refreshBanner() {
         val peer = currentPeer()
         val text = when {
-            !service.isConnected -> "Sunucuya bağlı değilsin, mesaj gönderilemez."
+            !service.isConnected -> "You're not connected, messages can't be sent."
             peer == null || peer.userId.isBlank() -> null
-            !peer.online -> "${peer.name} şu an offline — gönderdiğin mesaj ulaşmaz."
+            !peer.online -> "${peer.name} is offline — your message won't be delivered."
             else -> null
         }
         if (text != null) {
@@ -281,10 +281,10 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
         override fun onChatError(id: String, reason: String) {
             ApplicationManager.getApplication().invokeLater {
                 val human = when (reason) {
-                    "offline" -> "alıcı offline"
-                    "rate-limited" -> "çok hızlı"
-                    "disconnected" -> "bağlı değil"
-                    else -> "gönderilemedi"
+                    "offline" -> "recipient offline"
+                    "rate-limited" -> "too fast"
+                    "disconnected" -> "not connected"
+                    else -> "send failed"
                 }
                 if (updateMessageById(id) { it.sending = false; it.failed = human }) renderConversation()
             }
@@ -295,7 +295,7 @@ class DevradarChatPanel(project: Project) : JBPanel<DevradarChatPanel>(BorderLay
                 if (!connected) {
                     // Mark every still-pending optimistic message as failed.
                     for ((_, msgs) in conversations) {
-                        for (m in msgs) if (m.sending) { m.sending = false; m.failed = "bağlı değil" }
+                        for (m in msgs) if (m.sending) { m.sending = false; m.failed = "not connected" }
                     }
                 }
                 renderConversation()

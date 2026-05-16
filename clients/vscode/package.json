@@ -1,8 +1,8 @@
 {
   "name": "devradar-vscode",
-  "displayName": "devradar — kim online",
-  "description": "Hangi takım arkadaşın şu an aynı repoda kod yazıyor — IDE'den bağımsız presence",
-  "version": "0.2.1",
+  "displayName": "devradar — who's online",
+  "description": "See which teammate is coding in the same git repo right now — IDE-agnostic developer presence + 1-to-1 chat",
+  "version": "0.2.2",
   "publisher": "MertKont",
   "license": "GPL-3.0-or-later",
   "repository": {
@@ -28,24 +28,24 @@
         "devradar.serverUrl": {
           "type": "string",
           "default": "wss://devradar.mrt-kntt53.workers.dev/ws",
-          "description": "devradar WebSocket sunucu adresi (genelde değiştirmene gerek yok)"
+          "description": "devradar WebSocket server URL (you usually don't need to change this)"
         },
         "devradar.displayName": {
           "type": "string",
           "default": "",
-          "description": "Görünecek isim. Boş bırakılırsa git'teki adın (user.name) otomatik kullanılır."
+          "description": "Display name. If empty, your git user.name is used automatically."
         },
         "devradar.teamKey": {
           "type": "string",
           "default": "",
-          "description": "Opsiyonel gizlilik anahtarı. Aynı repodaki herkes aynı değeri girerse, repo adresini bilen yabancılar odaya giremez. Boş bırakılabilir — repo adresi tek başına eşleştirme için yeterli."
+          "description": "Optional privacy key. If everyone in the same repo enters the same value, outsiders who know the repo URL cannot join the room. Can be left empty — the repo URL alone is enough for matching."
         }
       }
     },
     "commands": [
-      { "command": "devradar.showPeers", "title": "devradar: Kimler online?" },
-      { "command": "devradar.reconnect", "title": "devradar: Yeniden bağlan" },
-      { "command": "devradar.openChat", "title": "devradar: Sohbet aç" }
+      { "command": "devradar.showPeers", "title": "devradar: Who's online?" },
+      { "command": "devradar.reconnect", "title": "devradar: Reconnect" },
+      { "command": "devradar.openChat", "title": "devradar: Open chat" }
     ]
   },
   "scripts": {

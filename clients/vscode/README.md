@@ -1,35 +1,37 @@
 # devradar
 
-Aynı repoyu açan takım arkadaşlarının **şu an kod yazıp yazmadığını** gösterir — IDE'den ve işletim sisteminden bağımsız.
+See which teammates have **the same git repo open and are coding right now** — IDE- and OS-agnostic.
 
-- **Kim online, kim offline** — durum çubuğunda canlı sayı
-- **Kim hangi dosyada** — üstüne gelince görürsün
-- **Sıfır ayar**: token yok, giriş yok, isim girmek yok. Eklenti git'ten adını/e-postanı, repodan da "odanı" otomatik bulur.
-- **Otomatik eşleştirme**: aynı git reposunu açan herkes aynı odada. Farklı repodakiler görünmez.
+- **Who's online, who's offline** — live count in the status bar
+- **Who's editing what file** — hover over the status bar for details
+- **1-to-1 chat** in a panel next to your editor, with peers in the same repo
+- **Zero configuration**: no tokens, no login, no name to type. The extension reads your name/email from git and derives your "room" from the repo URL.
+- **Automatic matching**: everyone who has the same git repo open lands in the same room. Different repos stay isolated.
 
-## Nasıl çalışır
+## How it works
 
-Eklenti, çalıştığın klasörün git `remote.origin.url` adresini okur, ondan bir oda anahtarı türetir ve devradar sunucusuna bağlanır. Aynı repoyu klonlamış başka biri de eklentiyi kurmuşsa, ikiniz aynı odada birbirinizi görürsünüz. Kimliğin git'teki `user.name` (görünen isim) ve `user.email` (gizli kimlik — laptop'a değil sana bağlı).
+The extension reads the `remote.origin.url` of your workspace's git repo, hashes it into a room key, and connects to the devradar server. Anyone else with that same repo cloned and the extension installed lands in the same room. Your identity comes from git's `user.name` (display name) and `user.email` (a stable hash — tied to you, not your laptop).
 
-Git remote'u olmayan bir klasör açtığında eklenti sessizce devre dışı kalır.
+Folders without a git remote silently disable the extension.
 
-## Ayarlar
+## Settings
 
-| Ayar | Varsayılan | Açıklama |
+| Setting | Default | Description |
 |---|---|---|
-| `devradar.serverUrl` | `wss://devradar.mrt-kntt53.workers.dev/ws` | Presence sunucusu. Kendi sunucunu çalıştırıyorsan değiştir. |
-| `devradar.displayName` | _(boş)_ | Görünen ismi elle ayarla. Boşsa git `user.name` kullanılır. |
-| `devradar.teamKey` | _(boş)_ | Gizlilik için ortak bir kelime. Aynı repodaki herkes aynısını girerse, repo adresini bilen yabancılar odaya giremez. |
+| `devradar.serverUrl` | `wss://devradar.mrt-kntt53.workers.dev/ws` | Presence server URL. Change this if you run your own. |
+| `devradar.displayName` | _(empty)_ | Override the displayed name. Falls back to git `user.name`. |
+| `devradar.teamKey` | _(empty)_ | Optional shared phrase. If everyone in the same repo enters the same value, outsiders who know the repo URL cannot join the room. |
 
-## Komutlar
+## Commands
 
-- **devradar: Kimler online?** — bu repoda kimin nerede olduğunu listeler
-- **devradar: Yeniden bağlan** — bağlantıyı tazeler
+- **devradar: Who's online?** — list everyone in this repo and where they are
+- **devradar: Open chat** — open a chat with someone in the same repo
+- **devradar: Reconnect** — force a fresh WebSocket connection
 
-## Kendi sunucun
+## Run your own server
 
-Sunucu açık kaynak (Cloudflare Workers + Durable Objects): https://github.com/mertkont/devradar
+The presence server is open source (Cloudflare Workers + Durable Objects): https://github.com/mertkont/devradar
 
-## Lisans
+## License
 
 GPL-3.0-or-later

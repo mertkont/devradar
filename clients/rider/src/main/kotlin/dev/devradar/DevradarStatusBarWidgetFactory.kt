@@ -45,22 +45,22 @@ class DevradarStatusBarWidget(private val project: Project) :
             val where = if (u.status == "online") {
                 u.ide + (u.file?.let { " · $it" } ?: "")
             } else {
-                "offline · son görülme: ${formatLastSeen(u.lastSeen)}"
+                "offline · last seen ${formatLastSeen(u.lastSeen)}"
             }
             // VS Code lets you open a chat panel with offline peers too (input
             // stays disabled, banner explains why) — match that behaviour so
             // clicking an offline row from the status-bar popup also works.
-            val suffix = if (u.userId == svc.selfUserId) "   (sen)" else "   →  💬 sohbet"
+            val suffix = if (u.userId == svc.selfUserId) "   (you)" else "   →  💬 chat"
             rows.add("$dot${u.userName}  —  $where$suffix")
             peers.add(u)
         }
         if (rows.isEmpty()) {
-            rows.add("(henüz veri yok)")
+            rows.add("(no data yet)")
             peers.add(null)
         }
         JBPopupFactory.getInstance()
             .createPopupChooserBuilder(rows)
-            .setTitle("devradar — birine tıkla → sohbet")
+            .setTitle("devradar — click someone → chat")
             .setItemChosenCallback { chosen ->
                 val idx = rows.indexOf(chosen)
                 val peer = peers.getOrNull(idx) ?: return@setItemChosenCallback

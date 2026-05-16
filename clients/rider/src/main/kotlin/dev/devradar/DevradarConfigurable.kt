@@ -20,11 +20,11 @@ class DevradarConfigurable : Configurable {
     override fun createComponent(): JComponent {
         reset()
         val panel = FormBuilder.createFormBuilder()
-            .addLabeledComponent("Sunucu adresi (wss://…/ws):", serverUrlField)
-            .addLabeledComponent("Görünen isim:", displayNameField)
-            .addComponent(JBLabel("Boş bırakılırsa git'teki adın (user.name) kullanılır."))
-            .addLabeledComponent("Takım anahtarı (opsiyonel):", teamKeyField)
-            .addComponent(JBLabel("Aynı repodaki herkes aynı değeri girerse, repo adresini bilen yabancılar odaya giremez."))
+            .addLabeledComponent("Server URL (wss://…/ws):", serverUrlField)
+            .addLabeledComponent("Display name:", displayNameField)
+            .addComponent(JBLabel("If empty, your git user.name is used."))
+            .addLabeledComponent("Team key (optional):", teamKeyField)
+            .addComponent(JBLabel("If everyone in the same repo enters the same value, outsiders who know the repo URL cannot join the room."))
             .addComponentFillVertically(JPanel(), 0)
             .panel
         root = panel
