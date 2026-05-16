@@ -13,7 +13,6 @@ namespace Devradar
     /// WebSocket connection / presence tracking lives in DevradarService.
     /// </summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
-    [InstalledProductRegistration(vsixId: PackageGuids.DevradarPackageString, productName: "devradar", productDetails: "Developer presence + 1-to-1 chat for teammates on the same git repo", productId: "0.2.2")]
     [ProvideToolWindow(typeof(DevradarToolWindow), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")] // Solution Explorer guid as a sane dock target
     [ProvideOptionPage(typeof(DevradarOptionsPage), "devradar", "General", 0, 0, true)]
     [Guid(PackageGuids.DevradarPackageString)]

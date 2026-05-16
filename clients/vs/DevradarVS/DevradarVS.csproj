@@ -7,7 +7,6 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>Devradar</RootNamespace>
     <AssemblyName>Devradar</AssemblyName>
-    <ProjectGuid>{B9D4A6C8-7E0F-4F8D-9A3A-2C1F8D5E2F9A}</ProjectGuid>
 
     <!-- VSIX bits -->
     <GeneratePkgDefFile>true</GeneratePkgDefFile>
@@ -18,7 +17,6 @@
     <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
     <CreateVsixContainer>true</CreateVsixContainer>
     <DeployExtension>false</DeployExtension>
-    <ExtensionInstallationRoot>CommonExtensions</ExtensionInstallationRoot>
 
     <Version>0.2.2</Version>
   </PropertyGroup>
@@ -27,12 +25,12 @@
     <None Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
     </None>
-    <None Include="LICENSE.txt">
+    <Content Include="LICENSE.txt">
       <IncludeInVSIX>true</IncludeInVSIX>
-    </None>
-    <None Include="Resources\icon.png">
+    </Content>
+    <Content Include="Resources\icon.png">
       <IncludeInVSIX>true</IncludeInVSIX>
-    </None>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
