@@ -1,0 +1,69 @@
+name: Build Visual Studio VSIX
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'clients/vs/**'
+      - '.github/workflows/build-vs.yml'
+  pull_request:
+    paths:
+      - 'clients/vs/**'
+  workflow_dispatch:
+
+# Visual Studio extensions can only be built on Windows with MSBuild + the
+# VS SDK. We run on the Microsoft-hosted `windows-2022` image, which already
+# has Visual Studio 2022 Build Tools and MSBuild on PATH via setup-msbuild.
+
+jobs:
+  build:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+        with:
+          nuget-version: '6.x'
+
+      - name: Restore NuGet packages
+        working-directory: clients/vs
+        run: nuget restore devradar-vs.sln
+
+      - name: Build VSIX (Release)
+        working-directory: clients/vs
+        run: msbuild devradar-vs.sln /p:Configuration=Release /p:DeployExtension=false /p:Platform="Any CPU" /m
+
+      - name: Locate VSIX
+        id: vsix
+        working-directory: clients/vs
+        run: |
+          $vsix = Get-ChildItem -Recurse -Filter *.vsix -Path .\DevradarVS\bin\Release | Select-Object -First 1
+          if (-not $vsix) { Write-Error "VSIX not found"; exit 1 }
+          Write-Host "Found: $($vsix.FullName)"
+          "vsix_path=$($vsix.FullName)" >> $env:GITHUB_OUTPUT
+          "vsix_name=$($vsix.Name)"     >> $env:GITHUB_OUTPUT
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: devradar-vsix
+          path: ${{ steps.vsix.outputs.vsix_path }}
+          if-no-files-found: error
+
+      - name: Summary
+        run: |
+          "### devradar VSIX built"           >> $env:GITHUB_STEP_SUMMARY
+          ""                                  >> $env:GITHUB_STEP_SUMMARY
+          "Download from the **Artifacts** section at the top of this run."        >> $env:GITHUB_STEP_SUMMARY
+          "Then install with **Double-click the .vsix** on a Windows machine."     >> $env:GITHUB_STEP_SUMMARY
+          ""                                  >> $env:GITHUB_STEP_SUMMARY
+          "Filename: ${{ steps.vsix.outputs.vsix_name }}"  >> $env:GITHUB_STEP_SUMMARY

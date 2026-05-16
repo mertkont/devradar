@@ -1,0 +1,92 @@
+<UserControl x:Class="Devradar.DevradarToolWindowControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vsui="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
+             xmlns:vsshell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
+             Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
+             Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+             FontFamily="{DynamicResource {x:Static vsui:VsFonts.EnvironmentFontFamilyKey}}"
+             FontSize="{DynamicResource {x:Static vsui:VsFonts.EnvironmentFontSizeKey}}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />     <!-- header -->
+            <RowDefinition Height="*" MinHeight="80" />   <!-- peers -->
+            <RowDefinition Height="5" />        <!-- splitter -->
+            <RowDefinition Height="2*" MinHeight="120" /> <!-- chat -->
+        </Grid.RowDefinitions>
+
+        <!-- Header: project repo + connection status + reconnect -->
+        <DockPanel Grid.Row="0" Margin="8,6">
+            <Button x:Name="ReconnectButton" DockPanel.Dock="Right" Content="Reconnect" Padding="8,2" Click="OnReconnectClicked"/>
+            <TextBlock x:Name="HeaderText" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+        </DockPanel>
+
+        <!-- Peers list -->
+        <ListBox Grid.Row="1" x:Name="PeersList" Margin="6,0,6,0"
+                 BorderThickness="1"
+                 Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
+                 BorderBrush="{DynamicResource {x:Static vsshell:VsBrushes.PanelBorderKey}}"
+                 HorizontalContentAlignment="Stretch"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 SelectionChanged="OnPeerSelectionChanged">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="2,3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Ellipse Grid.Column="0" Width="8" Height="8" Margin="0,0,8,0"
+                                 VerticalAlignment="Center"
+                                 Fill="{Binding StatusBrush}"/>
+                        <StackPanel Grid.Column="1" Orientation="Vertical">
+                            <TextBlock Text="{Binding UserName}" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding SubLine}" FontSize="11"
+                                       Foreground="{DynamicResource {x:Static vsshell:VsBrushes.GrayTextKey}}"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Text="{Binding RightHint}" FontSize="11"
+                                   Foreground="{DynamicResource {x:Static vsshell:VsBrushes.GrayTextKey}}"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Splitter between peers and chat -->
+        <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch"
+                      Background="{DynamicResource {x:Static vsshell:VsBrushes.PanelBorderKey}}"/>
+
+        <!-- Chat -->
+        <DockPanel Grid.Row="3" Margin="6,4,6,6">
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                <TextBlock x:Name="ChatStatusText" DockPanel.Dock="Right" FontSize="11"
+                           Foreground="{DynamicResource {x:Static vsshell:VsBrushes.GrayTextKey}}"
+                           VerticalAlignment="Center" Margin="6,0,0,0"/>
+                <TextBlock x:Name="ChatHeaderText" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            </DockPanel>
+
+            <Border x:Name="Banner" DockPanel.Dock="Top" Padding="6,4" Margin="0,0,0,4"
+                    Visibility="Collapsed" Background="#FFFCE9D6">
+                <TextBlock x:Name="BannerText" Foreground="#FFCC7000"/>
+            </Border>
+
+            <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
+                <Button x:Name="SendButton" DockPanel.Dock="Right" Content="Send" Padding="14,4"
+                        Margin="6,0,0,0" Click="OnSendClicked" IsEnabled="False"/>
+                <TextBox x:Name="InputField" VerticalAlignment="Stretch"
+                         AcceptsReturn="False" KeyDown="OnInputKeyDown" IsEnabled="False"/>
+            </DockPanel>
+
+            <Border BorderThickness="1"
+                    BorderBrush="{DynamicResource {x:Static vsshell:VsBrushes.PanelBorderKey}}">
+                <ScrollViewer x:Name="TranscriptScroll" VerticalScrollBarVisibility="Auto">
+                    <TextBox x:Name="Transcript" IsReadOnly="True" Background="Transparent"
+                             BorderThickness="0" TextWrapping="Wrap" FontFamily="Consolas"
+                             FontSize="12" Padding="6"/>
+                </ScrollViewer>
+            </Border>
+        </DockPanel>
+    </Grid>
+</UserControl>
