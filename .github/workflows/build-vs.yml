@@ -66,8 +66,19 @@ jobs:
         id: vsix
         working-directory: clients/vs
         run: |
-          $vsix = Get-ChildItem -Recurse -Filter *.vsix -Path .\DevradarVS\bin\Release | Select-Object -First 1
-          if (-not $vsix) { Write-Error "VSIX not found"; exit 1 }
+          Write-Host "=== Listing clients/vs/DevradarVS/bin (recursive) ==="
+          if (Test-Path .\DevradarVS\bin) {
+            Get-ChildItem -Recurse .\DevradarVS\bin | Select-Object FullName, Length | Format-Table -AutoSize | Out-String | Write-Host
+          } else {
+            Write-Host "(no bin folder)"
+          }
+          # Search anywhere under clients/vs for any .vsix (covers
+          # bin/Release/Devradar.vsix and bin/Release/net48/Devradar.vsix).
+          $vsix = Get-ChildItem -Recurse -Filter *.vsix -Path . | Select-Object -First 1
+          if (-not $vsix) {
+            Write-Host "::error::No .vsix produced anywhere under clients/vs after the build. Check the build log artifact."
+            exit 1
+          }
           Write-Host "Found: $($vsix.FullName)"
           "vsix_path=$($vsix.FullName)" >> $env:GITHUB_OUTPUT
           "vsix_name=$($vsix.Name)"     >> $env:GITHUB_OUTPUT
