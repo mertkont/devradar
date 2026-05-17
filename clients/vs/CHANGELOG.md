@@ -1,5 +1,14 @@
 # Change Log — devradar (Visual Studio)
 
+## 0.2.3
+
+- Marketplace listing improvements:
+  - Overview rewritten with a feature walkthrough and embedded
+    screenshots (shared with the VS Code listing — the UI is similar).
+  - Description matches the JetBrains and VS Code listings for
+    consistency across the suite.
+- No code changes.
+
 ## 0.2.2
 
 - **Initial release.** Tool window under `View → Other Windows → devradar`
