@@ -1,5 +1,15 @@
 # Change Log — devradar (Rider / JetBrains)
 
+## 0.2.3
+
+- **Marketplace listing improvements** — no code changes:
+  - Plugin description rewritten with the full feature set (chat tool
+    window, balloon notifications, settings) — the previous text was
+    from 0.1.x and only mentioned the status-bar widget.
+  - Added `<change-notes>` to `plugin.xml` so the marketplace listing's
+    "What's New" section actually shows the version history.
+  - Screenshots upload (via plugins.jetbrains.com web UI) recommended.
+
 ## 0.2.2
 
 - UI strings are now English (was Turkish). No functional changes.
