@@ -1,5 +1,11 @@
 # Change Log — devradar (Visual Studio)
 
+## 0.2.4
+
+- Marketplace listing Overview updated. No code changes — identical
+  binary to 0.2.3; the version bump exists only because the VS
+  Marketplace publisher UI requires it to update listing metadata.
+
 ## 0.2.3
 
 - Marketplace listing improvements:
