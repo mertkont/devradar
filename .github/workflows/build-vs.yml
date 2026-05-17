@@ -42,11 +42,12 @@ jobs:
         working-directory: clients/vs
         run: |
           $log = "${{ runner.temp }}\msbuild.log"
-          # With Microsoft.VSSDK.BuildTools properly registered (no longer
-          # shadowed by the Microsoft.VisualStudio.SDK meta-package), the
-          # default Build target's BuildDependsOn chain includes
-          # CreateVsixContainer, so a plain build produces the .vsix.
-          msbuild devradar-vs.sln /p:Configuration=Release /p:DeployExtension=false /p:Platform="Any CPU" /m /v:minimal /clp:ShowTimestamp 2>&1 | Tee-Object -FilePath $log
+          # CreateVsixContainer is now registered (via explicit Import of
+          # Microsoft.VsSDK.targets in the csproj) but Microsoft.NET.Sdk
+          # appears to overwrite PrepareForRunDependsOn AFTER the VSSDK
+          # targets append to it, so a plain /t:Build doesn't trigger it.
+          # Pass it as an explicit target after Build to force packaging.
+          msbuild devradar-vs.sln /t:Build`;CreateVsixContainer /p:Configuration=Release /p:DeployExtension=false /p:Platform="Any CPU" /m /v:minimal /clp:ShowTimestamp 2>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) {
             Write-Host "::group::Last 200 lines of MSBuild output"
             Get-Content $log -Tail 200
