@@ -80,17 +80,22 @@ jobs:
         id: vsix
         working-directory: clients/vs
         run: |
-          Write-Host "=== Listing clients/vs/DevradarVS/bin (recursive) ==="
-          if (Test-Path .\DevradarVS\bin) {
-            Get-ChildItem -Recurse .\DevradarVS\bin | Select-Object FullName, Length | Format-Table -AutoSize | Out-String | Write-Host
-          } else {
-            Write-Host "(no bin folder)"
+          # Promote bin/ and obj/ tree dump to annotations so we can see
+          # exactly what MSBuild produced even without auth to download logs.
+          foreach ($d in @('.\DevradarVS\bin', '.\DevradarVS\obj')) {
+            if (Test-Path $d) {
+              Write-Host "::warning::TREE $d :"
+              Get-ChildItem -Recurse $d | ForEach-Object {
+                $rel = $_.FullName.Substring((Resolve-Path .).Path.Length)
+                Write-Host "::warning::  $($_.Length.ToString().PadLeft(10)) $rel"
+              }
+            } else {
+              Write-Host "::warning::TREE $d : (does not exist)"
+            }
           }
-          # Search anywhere under clients/vs for any .vsix (covers
-          # bin/Release/Devradar.vsix and bin/Release/net48/Devradar.vsix).
           $vsix = Get-ChildItem -Recurse -Filter *.vsix -Path . | Select-Object -First 1
           if (-not $vsix) {
-            Write-Host "::error::No .vsix produced anywhere under clients/vs after the build. Check the build log artifact."
+            Write-Host "::error::No .vsix produced anywhere under clients/vs after the build."
             exit 1
           }
           Write-Host "Found: $($vsix.FullName)"
