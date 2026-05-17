@@ -1,5 +1,15 @@
 # Change Log — devradar (VS Code)
 
+## 0.2.3
+
+- **Marketplace listing improvements** — no code changes, just polish:
+  - Added screenshots to the README (status bar, peer list, chat panel,
+    notifications) so the marketplace listing now actually shows what
+    devradar looks like.
+  - Rewrote the description with a clearer walkthrough of each feature
+    and added the "intentionally not included" section so users know
+    what to expect (and what not to).
+
 ## 0.2.2
 
 - UI strings are now English (was Turkish). No functional changes.

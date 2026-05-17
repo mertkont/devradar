@@ -2,7 +2,7 @@
   "name": "devradar-vscode",
   "displayName": "devradar — who's online",
   "description": "See which teammate is coding in the same git repo right now — IDE-agnostic developer presence + 1-to-1 chat",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "MertKont",
   "license": "GPL-3.0-or-later",
   "repository": {
