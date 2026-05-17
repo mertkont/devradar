@@ -9,6 +9,7 @@ namespace Devradar
     /// settings: server URL, display-name override, and an optional team key.
     /// All three default to empty / the public devradar.workers.dev URL.
     /// </summary>
+    [ComVisible(true)] // required by VS — DialogPage is instantiated via COM by the Options dialog
     [Guid(PackageGuids.DevradarOptionsPageString)]
     public class DevradarOptionsPage : DialogPage
     {

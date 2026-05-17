@@ -340,13 +340,13 @@ namespace Devradar
         private void HandleChat(JObject obj)
         {
             var msg = new ChatMessage(
-                id: (string?)obj["id"] ?? string.Empty,
-                from: (string?)obj["from"] ?? string.Empty,
-                fromName: (string?)obj["fromName"] ?? "?",
-                to: (string?)obj["to"] ?? string.Empty,
-                text: (string?)obj["text"] ?? string.Empty,
-                ts: (long?)obj["ts"] ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                self: ((string?)obj["from"]) == SelfUserId);
+                Id: (string?)obj["id"] ?? string.Empty,
+                From: (string?)obj["from"] ?? string.Empty,
+                FromName: (string?)obj["fromName"] ?? "?",
+                To: (string?)obj["to"] ?? string.Empty,
+                Text: (string?)obj["text"] ?? string.Empty,
+                Ts: (long?)obj["ts"] ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                Self: ((string?)obj["from"]) == SelfUserId);
             if (string.IsNullOrEmpty(msg.Id) || string.IsNullOrEmpty(msg.From)) return;
             lock (_stateLock)
             {

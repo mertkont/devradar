@@ -40,7 +40,10 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <!-- Newtonsoft.Json comes in transitively via Community.VisualStudio.Toolkit
+         which pins to 13.0.1. Explicitly referencing a newer version trips
+         Toolkit's NewtonsoftJsonVersionCheck (CVSTBLD002), so we just inherit. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
 
 </Project>

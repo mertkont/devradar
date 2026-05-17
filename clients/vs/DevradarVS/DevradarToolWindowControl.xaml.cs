@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Windows;
@@ -310,7 +309,10 @@ namespace Devradar
 
         // ---------- View model rows ----------
 
-        private sealed class PeerVm : INotifyPropertyChanged
+        // We rebuild the ObservableCollection on every presence refresh rather
+        // than mutating individual rows, so PropertyChanged plumbing isn't
+        // needed (which is why this isn't INotifyPropertyChanged).
+        private sealed class PeerVm
         {
             public string UserId { get; set; } = string.Empty;
             public string UserName { get; set; } = string.Empty;
@@ -319,7 +321,6 @@ namespace Devradar
             public bool IsOnline { get; set; }
             public bool IsSelf { get; set; }
             public Brush StatusBrush { get; set; } = Brushes.Gray;
-            public event PropertyChangedEventHandler? PropertyChanged;
         }
 
         private sealed class UiMessage
