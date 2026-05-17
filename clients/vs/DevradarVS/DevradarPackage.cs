@@ -19,7 +19,12 @@ namespace Devradar
     // wouldn't see them online until they opened the chat. This brings
     // VS in line with the VS Code extension (activates on startup) and
     // the JetBrains plugin (ProjectActivity on project open).
-    [ProvideAutoLoad(UIContextGuids80.SolutionExists, PackageAutoLoadFlags.BackgroundLoad)]
+    //
+    // Hardcoded GUID is `vsContextGuidSolutionExists` — the same value
+    // UIContextGuids80.SolutionExists / VSConstants.UICONTEXT.SolutionExists_string
+    // expand to. Using the literal avoids importing the right namespace
+    // (depends on which Microsoft.VisualStudio.* assembly is available).
+    [ProvideAutoLoad("f1536ef8-92ec-443c-9ed7-fdadf150da82", PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideToolWindow(typeof(DevradarToolWindow), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")] // Solution Explorer guid as a sane dock target
     [ProvideOptionPage(typeof(DevradarOptionsPage), "devradar", "General", 0, 0, true)]
     [Guid(PackageGuids.DevradarPackageString)]
