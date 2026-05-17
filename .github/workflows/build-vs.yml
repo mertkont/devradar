@@ -42,11 +42,11 @@ jobs:
         working-directory: clients/vs
         run: |
           $log = "${{ runner.temp }}\msbuild.log"
-          # Explicit target list — Build alone wasn't producing the .vsix on
-          # this project / VSSDK version. CreateVsixContainer is in the
-          # BuildDependsOn chain in theory, but adding it explicitly is the
-          # belt-and-braces fix and costs nothing if it would have run anyway.
-          msbuild devradar-vs.sln /t:Build`;CreateVsixContainer /p:Configuration=Release /p:DeployExtension=false /p:Platform="Any CPU" /m /v:minimal /clp:ShowTimestamp 2>&1 | Tee-Object -FilePath $log
+          # With Microsoft.VSSDK.BuildTools properly registered (no longer
+          # shadowed by the Microsoft.VisualStudio.SDK meta-package), the
+          # default Build target's BuildDependsOn chain includes
+          # CreateVsixContainer, so a plain build produces the .vsix.
+          msbuild devradar-vs.sln /p:Configuration=Release /p:DeployExtension=false /p:Platform="Any CPU" /m /v:minimal /clp:ShowTimestamp 2>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) {
             Write-Host "::group::Last 200 lines of MSBuild output"
             Get-Content $log -Tail 200
