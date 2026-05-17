@@ -41,11 +41,12 @@ jobs:
       - name: Build VSIX (Release)
         working-directory: clients/vs
         run: |
-          # Tee MSBuild output so we capture errors even when the step fails;
-          # also emit a GitHub Actions ::error:: line on failure so the run's
-          # annotations actually surface the real reason.
           $log = "${{ runner.temp }}\msbuild.log"
-          msbuild devradar-vs.sln /p:Configuration=Release /p:DeployExtension=false /p:Platform="Any CPU" /m /clp:ShowTimestamp 2>&1 | Tee-Object -FilePath $log
+          # Explicit target list — Build alone wasn't producing the .vsix on
+          # this project / VSSDK version. CreateVsixContainer is in the
+          # BuildDependsOn chain in theory, but adding it explicitly is the
+          # belt-and-braces fix and costs nothing if it would have run anyway.
+          msbuild devradar-vs.sln /t:Build`;CreateVsixContainer /p:Configuration=Release /p:DeployExtension=false /p:Platform="Any CPU" /m /v:minimal /clp:ShowTimestamp 2>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) {
             Write-Host "::group::Last 200 lines of MSBuild output"
             Get-Content $log -Tail 200
@@ -53,6 +54,11 @@ jobs:
             Write-Host "::error::MSBuild failed with exit code $LASTEXITCODE"
             exit $LASTEXITCODE
           }
+          Write-Host "::group::bin/ tree after build"
+          if (Test-Path .\DevradarVS\bin) {
+            Get-ChildItem -Recurse .\DevradarVS\bin | Select-Object FullName, Length | Format-Table -AutoSize | Out-String | Write-Host
+          }
+          Write-Host "::endgroup::"
 
       - name: Upload MSBuild log on failure
         if: failure()
