@@ -51,6 +51,14 @@ jobs:
             Write-Host "::group::Last 200 lines of MSBuild output"
             Get-Content $log -Tail 200
             Write-Host "::endgroup::"
+            # Promote each MSBuild error/warning line to a GitHub annotation
+            # so the failure shows up on the run summary instead of needing
+            # someone to download the artifact.
+            Get-Content $log | Where-Object { $_ -match "\s(error|warning)\s[A-Z]+[0-9]+" } | Select-Object -First 25 | ForEach-Object {
+              $line = $_.Trim()
+              $level = if ($line -match "\serror\s") { "error" } else { "warning" }
+              Write-Host "::$level::$line"
+            }
             Write-Host "::error::MSBuild failed with exit code $LASTEXITCODE"
             exit $LASTEXITCODE
           }
