@@ -18,6 +18,13 @@
     <CreateVsixContainer>true</CreateVsixContainer>
     <DeployExtension>false</DeployExtension>
 
+    <!-- VSSDK targets unconditionally call createTemplateManifests inside
+         CreateVsixContainer; if $(TemplateOutputDirectory) is empty the
+         VsixUtil task fails with VSSDK1202 even when the project has zero
+         templates. Point it at an intermediate folder so the task has a
+         valid argument; nothing is actually written there for us. -->
+    <TemplateOutputDirectory>$(IntermediateOutputPath)Templates\</TemplateOutputDirectory>
+
     <Version>0.2.2</Version>
   </PropertyGroup>
 
