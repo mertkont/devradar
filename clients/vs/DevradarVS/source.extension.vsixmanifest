@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="Devradar.b9d4a6c8-7e0f-4f8d-9a3a-2c1f8d5e2f9a" Version="0.2.2" Language="en-US" Publisher="MertKont" />
+    <Identity Id="Devradar.b9d4a6c8-7e0f-4f8d-9a3a-2c1f8d5e2f9a" Version="0.2.2" Language="en-US" Publisher="Mert Kont" />
     <DisplayName>devradar — who's online</DisplayName>
     <Description xml:space="preserve">See which teammates are coding in the same git repo right now — IDE-agnostic developer presence + 1-to-1 chat. Identity is auto-derived from your git config, the "room" from the repo's remote URL. Works alongside the matching VS Code extension and JetBrains plugin.</Description>
     <MoreInfo>https://github.com/mertkont/devradar</MoreInfo>
