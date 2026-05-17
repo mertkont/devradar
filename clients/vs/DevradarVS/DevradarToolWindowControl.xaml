@@ -64,9 +64,16 @@
                 <TextBlock x:Name="ChatHeaderText" FontWeight="SemiBold" VerticalAlignment="Center"/>
             </DockPanel>
 
+            <!-- Theme-aware warning banner: muted Info-style colors that VS
+                 themes provide for both light and dark, instead of the
+                 hardcoded cream/amber that washed out on dark themes. -->
             <Border x:Name="Banner" DockPanel.Dock="Top" Padding="6,4" Margin="0,0,0,4"
-                    Visibility="Collapsed" Background="#FFFCE9D6">
-                <TextBlock x:Name="BannerText" Foreground="#FFCC7000"/>
+                    Visibility="Collapsed"
+                    Background="{DynamicResource {x:Static vsshell:VsBrushes.InfoBackgroundKey}}"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource {x:Static vsshell:VsBrushes.PanelBorderKey}}">
+                <TextBlock x:Name="BannerText"
+                           Foreground="{DynamicResource {x:Static vsshell:VsBrushes.InfoTextKey}}"/>
             </Border>
 
             <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">

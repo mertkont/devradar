@@ -188,13 +188,23 @@ namespace Devradar
             }
             catch
             {
+                // If we threw after assigning _ws / _cts (e.g. hello send failed),
+                // tear them down before scheduling a reconnect; otherwise the
+                // next ConnectAsync will overwrite both fields and the previous
+                // ws/cts pair leaks until process exit.
+                if (Volatile.Read(ref _generation) == gen) Disconnect("connect-failed");
                 ScheduleReconnect(gen);
             }
         }
 
         private void Disconnect(string reason)
         {
+            // Dispose + null the CTS so it doesn't leak across reconnect cycles —
+            // every Mac sleep/wake or network blip produces a fresh CTS otherwise,
+            // and the old ones just pile up on the heap waiting for GC.
             try { _cts?.Cancel(); } catch { }
+            try { _cts?.Dispose(); } catch { }
+            _cts = null;
             var ws = _ws;
             _ws = null;
             try { ws?.Abort(); } catch { }
